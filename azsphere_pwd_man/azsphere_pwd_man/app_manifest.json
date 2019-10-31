@@ -1,0 +1,23 @@
+{
+  "SchemaVersion": 1,
+  "Name" : "azsphere_pwd_man",
+  "ComponentId" : "3a941e31-5107-4f85-8cbc-7a6eef3e2227",
+  "EntryPoint": "/bin/app",
+  "CmdArgs": [],
+  "Capabilities": {
+    "AllowedConnections": [ "JGTestIoTHub.azure-devices.net" ],
+    "Gpio": [
+      "$PROJECT_BUTTON_1",
+      "$PROJECT_BUTTON_2",
+      "$PROJECT_RGBLED_RED",
+      "$PROJECT_RGBLED_GREEN",
+      "$PROJECT_RGBLED_BLUE"
+    ],
+    "I2cMaster": [
+      "$PROJECT_ISU2_I2C"
+    ],
+    "Uart": [],
+    "WifiConfig": false
+  },
+  "ApplicationType":"Default"
+}

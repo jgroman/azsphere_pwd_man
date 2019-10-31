@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio 15
+VisualStudioVersion = 15.0.28307.902
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "azsphere_pwd_man", "azsphere_pwd_man\azsphere_pwd_man.vcxproj", "{C561F12E-F863-4885-9C50-C5AB04F787E9}"
+EndProject
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "lib_u8g2", "lib_u8g2\lib_u8g2\lib_u8g2.vcxproj", "{10F4B2DD-B608-4B0B-BF95-08214F5695A4}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|ARM = Debug|ARM
+		Release|ARM = Release|ARM
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{C561F12E-F863-4885-9C50-C5AB04F787E9}.Debug|ARM.ActiveCfg = Debug|ARM
+		{C561F12E-F863-4885-9C50-C5AB04F787E9}.Debug|ARM.Build.0 = Debug|ARM
+		{C561F12E-F863-4885-9C50-C5AB04F787E9}.Release|ARM.ActiveCfg = Release|ARM
+		{C561F12E-F863-4885-9C50-C5AB04F787E9}.Release|ARM.Build.0 = Release|ARM
+		{10F4B2DD-B608-4B0B-BF95-08214F5695A4}.Debug|ARM.ActiveCfg = Debug|ARM
+		{10F4B2DD-B608-4B0B-BF95-08214F5695A4}.Debug|ARM.Build.0 = Debug|ARM
+		{10F4B2DD-B608-4B0B-BF95-08214F5695A4}.Release|ARM.ActiveCfg = Release|ARM
+		{10F4B2DD-B608-4B0B-BF95-08214F5695A4}.Release|ARM.Build.0 = Release|ARM
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {49A44D39-1B42-4FAE-AAF4-23CCE7A61D42}
+	EndGlobalSection
+EndGlobal
