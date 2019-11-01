@@ -41,8 +41,8 @@ namespace AzurePasswordManager.Pages
         }
 
         public async Task OnGetAsync() {
-            int retries = 0;
-            bool retry = false;
+            //int retries = 0;
+            //bool retry = false;
 
             // Create a ServiceClient to communicate with service-facing endpoint on your hub.
             s_serviceClient = ServiceClient.CreateFromConnectionString(connectionString);

@@ -10,6 +10,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.EntityFrameworkCore;
+
 using AzurePasswordManager.Data;
 
 namespace AzurePasswordManager {
@@ -28,11 +29,12 @@ namespace AzurePasswordManager {
                 options.MinimumSameSitePolicy = SameSiteMode.None;
             });
 
-            // Test1
+            // Test1 DB
             services.AddDbContext<AppDbContext>(options =>
                               options.UseInMemoryDatabase("name"));
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.
