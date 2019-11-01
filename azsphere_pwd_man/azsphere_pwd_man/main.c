@@ -34,7 +34,6 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-
 // applibs_versions.h defines the API struct versions to use for applibs APIs.
 #include "applibs_versions.h"
 #include <applibs/log.h>
@@ -47,14 +46,12 @@
 // Using a single-thread event loop pattern based on Epoll and timerfd
 #include "epoll_timerfd_utilities.h"
 
+// Azure IoT 
 #include "azure_iot_utilities.h"
-#include <azureiot/iothub_device_client_ll.h>
-
 #include "connection_strings.h"
 #include "build_options.h"
 
-
-
+// OLED display support library
 #include "lib_u8g2.h"
 
 /*******************************************************************************
@@ -69,6 +66,7 @@
 
 #define OLED_ROTATION       U8G2_R0
 
+#define DIRECT_METHOD_CALL_PAYLOAD_MAX      400
 
 /*******************************************************************************
 * Forward declarations of private functions
@@ -125,18 +123,15 @@ static void
 event_handler_timer_button(EventData *event_data);
 
 static void
-*SetupHeapMessage(const char *messageFormat, size_t maxLength, ...);
+*setup_heap_message(const char *messageFormat, size_t maxLength, ...);
 
 static int
-DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize, char **responsePayload, size_t *responsePayloadSize);
+cb_direct_method_call(const char *methodName, const char *payload, size_t payloadSize, char **responsePayload, size_t *responsePayloadSize);
 
 
 /*******************************************************************************
 * Global variables
 *******************************************************************************/
-
-extern IOTHUB_DEVICE_CLIENT_LL_HANDLE iothubClientHandle;
-
 
 // Termination state flag
 volatile sig_atomic_t gb_is_termination_requested = false;
@@ -203,16 +198,16 @@ main(int argc, char *argv[])
 
             // Setup the IoT Hub client.
             // Notes:
-            // - it is safe to call this function even if the client has already been set up, as in
-            //   this case it would have no effect;
+            // - it is safe to call this function even if the client has already
+            //   been set up, as in this case it would have no effect;
             // - a failure to setup the client is a fatal error.
             if (!AzureIoT_SetupClient()) {
                 Log_Debug("ERROR: Failed to set up IoT Hub client\n");
                 break;
             }
 
-            // AzureIoT_DoPeriodicTasks() needs to be called frequently in order to keep active
-            // the flow of data with the Azure IoT Hub
+            // AzureIoT_DoPeriodicTasks() needs to be called frequently in order
+            // to keep active the flow of data with the Azure IoT Hub
             AzureIoT_DoPeriodicTasks();
         }
 
@@ -262,7 +257,7 @@ init_handlers(void)
 
     // Tell the system about the callback function to call when we receive 
     // a Direct Method message from Azure
-    AzureIoT_SetDirectMethodCallback(&DirectMethodCall);
+    AzureIoT_SetDirectMethodCallback(&cb_direct_method_call);
 
 
     return result;
@@ -411,13 +406,13 @@ event_handler_timer_button(EventData *event_data)
 /// <param name="maxLength">The maximum length of the formatted message string</param>
 /// <returns>The pointer to the heap allocated memory.</returns>
 static void 
-*SetupHeapMessage(const char *messageFormat, size_t maxLength, ...)
+*setup_heap_message(const char *messageFormat, size_t maxLength, ...)
 {
     va_list args;
     va_start(args, maxLength);
-    char *message =
-        malloc(maxLength + 1); // Ensure there is space for the null terminator put by vsnprintf.
-    if (message != NULL) {
+    char *message = malloc(maxLength + 1); // +1 for the null terminator
+    if (message != NULL) 
+    {
         vsnprintf(message, maxLength, messageFormat, args);
     }
     va_end(args);
@@ -437,13 +432,15 @@ static void
 /// 400 HTTP status code if the payload is invalid;</returns>
 /// 404 HTTP status code if the method name is unknown.</returns>
 static int 
-DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize, char **responsePayload, size_t *responsePayloadSize)
+cb_direct_method_call(const char *methodName, const char *payload, 
+    size_t payloadSize, char **responsePayload, size_t *responsePayloadSize)
 {
     Log_Debug("\nDirect Method called %s\n", methodName);
 
     int result = 404; // HTTP status code.
 
-    if (payloadSize < 32) {
+    if (payloadSize < DIRECT_METHOD_CALL_PAYLOAD_MAX) 
+    {
 
         // Declare a char buffer on the stack where we'll operate on a copy of the payload.  
         char directMethodCallContent[payloadSize + 1];
@@ -457,8 +454,8 @@ DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize
         // Look for the haltApplication method name.  This direct method does not require any payload, other than
         // a valid Json argument such as {}.
 
-        if (strcmp(methodName, "haltApplication") == 0) {
-
+        if (strcmp(methodName, "haltApplication") == 0) 
+        {
             // Log that the direct method was called and set the result to reflect success!
             Log_Debug("haltApplication() Direct Method called\n");
             result = 200;
@@ -467,8 +464,9 @@ DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize
             static const char resetOkResponse[] =
                 "{ \"success\" : true, \"message\" : \"Halting Application\" }";
             size_t responseMaxLength = sizeof(resetOkResponse);
-            *responsePayload = SetupHeapMessage(resetOkResponse, responseMaxLength);
-            if (*responsePayload == NULL) {
+            *responsePayload = setup_heap_message(resetOkResponse, responseMaxLength);
+            if (*responsePayload == NULL) 
+            {
                 Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
                 abort();
             }
@@ -482,14 +480,15 @@ DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize
         }
 
         // Check to see if the setSensorPollTime direct method was called
-        else if (strcmp(methodName, "setSensorPollTime") == 0) {
-
+        else if (strcmp(methodName, "setSensorPollTime") == 0) 
+        {
             // Log that the direct method was called and set the result to reflect success!
             Log_Debug("setSensorPollTime() Direct Method called\n");
             result = 200;
 
             // The payload should contain a JSON object such as: {"pollTime": 20}
-            if (directMethodCallContent == NULL) {
+            if (directMethodCallContent == NULL) 
+            {
                 Log_Debug("ERROR: Could not allocate buffer for direct method request payload.\n");
                 abort();
             }
@@ -501,32 +500,36 @@ DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize
             JSON_Value *payloadJson = json_parse_string(directMethodCallContent);
 
             // Verify we have a valid JSON string from the payload
-            if (payloadJson == NULL) {
+            if (payloadJson == NULL) 
+            {
                 goto payloadError;
             }
 
             // Verify that the payloadJson contains a valid JSON object
             JSON_Object *pollTimeJson = json_value_get_object(payloadJson);
-            if (pollTimeJson == NULL) {
+            if (pollTimeJson == NULL) 
+            {
                 goto payloadError;
             }
 
             // Pull the Key: value pair from the JSON object, we're looking for {"pollTime": <integer>}
             // Verify that the new timer is < 0
             int newPollTime = (int)json_object_get_number(pollTimeJson, "pollTime");
-            if (newPollTime < 1) {
+            if (newPollTime < 1) 
+            {
                 goto payloadError;
             }
-            else {
-
+            else 
+            {
                 Log_Debug("New PollTime %d\n", newPollTime);
 
                 // Construct the response message.  This will be displayed in the cloud when calling the direct method
                 static const char newPollTimeResponse[] =
                     "{ \"success\" : true, \"message\" : \"New Sensor Poll Time %d seconds\" }";
                 size_t responseMaxLength = sizeof(newPollTimeResponse) + strlen(payload);
-                *responsePayload = SetupHeapMessage(newPollTimeResponse, responseMaxLength, newPollTime);
-                if (*responsePayload == NULL) {
+                *responsePayload = setup_heap_message(newPollTimeResponse, responseMaxLength, newPollTime);
+                if (*responsePayload == NULL) 
+                {
                     Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
                     abort();
                 }
@@ -541,14 +544,16 @@ DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize
                 return result;
             }
         }
-        else {
+        else 
+        {
             result = 404;
             Log_Debug("INFO: Direct Method called \"%s\" not found.\n", methodName);
 
             static const char noMethodFound[] = "\"method not found '%s'\"";
             size_t responseMaxLength = sizeof(noMethodFound) + strlen(methodName);
-            *responsePayload = SetupHeapMessage(noMethodFound, responseMaxLength, methodName);
-            if (*responsePayload == NULL) {
+            *responsePayload = setup_heap_message(noMethodFound, responseMaxLength, methodName);
+            if (*responsePayload == NULL) 
+            {
                 Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
                 abort();
             }
@@ -557,8 +562,9 @@ DirectMethodCall(const char *methodName, const char *payload, size_t payloadSize
         }
 
     }
-    else {
-        Log_Debug("Payload size > 32 bytes, aborting Direct Method execution\n");
+    else 
+    {
+        Log_Debug("Payload size over limit, aborting Direct Method execution\n");
         goto payloadError;
     }
 
@@ -571,12 +577,12 @@ payloadError:
     Log_Debug("INFO: Unrecognised direct method payload format.\n");
 
     static const char noPayloadResponse[] =
-        "{ \"success\" : false, \"message\" : \"request does not contain an identifiable "
-        "payload\" }";
+        "{ \"success\" : false, \"message\" : \"Request does not contain an "
+        "identifiable payload\" }";
 
     size_t responseMaxLength = sizeof(noPayloadResponse) + strlen(payload);
     responseMaxLength = sizeof(noPayloadResponse);
-    *responsePayload = SetupHeapMessage(noPayloadResponse, responseMaxLength);
+    *responsePayload = setup_heap_message(noPayloadResponse, responseMaxLength);
     if (*responsePayload == NULL) {
         Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
         abort();
