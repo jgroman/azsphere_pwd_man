@@ -10,16 +10,16 @@ using Newtonsoft.Json;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace iot_test_device
+namespace sphere_simulator
 {
-    class IotTestDevice
+    class SphereSimulator
     {
         private static DeviceClient s_deviceClient;
 
         // The device connection string to authenticate the device with your IoT hub.
         // Using the Azure CLI:
         // az iot hub device-identity show-connection-string --hub-name {YourIoTHubName} --device-id IotTestDevice --output table
-        private readonly static string s_connectionString = "HostName=JGTestIoTHub.azure-devices.net;DeviceId=IotTestDevice;SharedAccessKey=ZJKGicc0LbkKfZ08nRQ1cUJJbFpaIBZRmQi8qf3BCqg=";
+        private readonly static string s_connectionString = "HostName=JGTestIoTHub.azure-devices.net;DeviceId=SphereSimulator;SharedAccessKey=KTGeyIUBbC8j8xWQ3Nlye/DY+sl0GuFc/1ix8Y/llCM=";
 
         private static int s_telemetryInterval = 100; // Seconds
 
@@ -82,13 +82,14 @@ namespace iot_test_device
         }
         private static void Main(string[] args)
         {
-            Console.WriteLine("IoT Hub - Simulated device. Ctrl-C to exit.\n");
+            Console.WriteLine("Azure Sphere Simulated Device. Ctrl-C to exit.\n");
 
             // Connect to the IoT hub using the MQTT protocol
             s_deviceClient = DeviceClient.CreateFromConnectionString(s_connectionString, TransportType.Mqtt);
 
             // Create a handler for the direct method call
             s_deviceClient.SetMethodHandlerAsync("SetTelemetryInterval", SetTelemetryInterval, null).Wait();
+
             SendDeviceToCloudMessagesAsync();
             Console.ReadLine();
         }
