@@ -6,4 +6,25 @@
 
 <h1>Config</h1>
 
-<p>Result: @Model.Message</p>
+<div asp-validation-summary="All"></div>
+<form method="POST">
+    <div>
+        <label asp-for="IotHubServiceConnString" class="control-label"></label>
+        <input asp-for="IotHubServiceConnString"
+               value="@Model.IotHubServiceConnString" />
+    </div>
+    <input type="hidden" asp-for="InputId" value="iothub" />
+    <input type="submit" />
+</form>
+<h3>@ViewData["confirmation1"]</h3>
+
+<form method="POST">
+    <div>
+        <label asp-for="AzureSphereDeviceConnString" class="control-label"></label>
+        <input asp-for="AzureSphereDeviceConnString"
+               value="@Model.AzureSphereDeviceConnString" />
+    </div>
+    <input type="hidden" asp-for="InputId" value="device" />
+    <input type="submit" />
+</form>
+<h3>@ViewData["confirmation2"]</h3>

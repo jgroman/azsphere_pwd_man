@@ -15,54 +15,131 @@ namespace AzurePasswordManager.Pages
 {
     public class ConfigModel : PageModel
     {
-        public string Message { get; set; }
+        [BindProperty]
+        public string IotHubServiceConnString { get; set; }
+
+        [BindProperty]
+        public string AzureSphereDeviceConnString { get; set; }
+
+        [BindProperty]
+        public string InputId { get; set; }
 
         private readonly IConfiguration _config;
 
-        // Note: In KeyVault key names replace ":" with "--"
-        private readonly static string configKeyVaultNameKey = "ConfigKeyVaultName";
-        private readonly static string iotHubServiceConnStringKey = "ConnectionStrings:IotHubServicez";
+        private readonly string iotHubServiceConnStringKey;
+        private readonly string azureSphereDeviceConnStringKey;
 
-        private string iotHubServiceConnString;
+        private static AzureServiceTokenProvider azureServiceTokenProvider = 
+            new AzureServiceTokenProvider();
+        private static KeyVaultClient keyVaultClient = new KeyVaultClient(
+            new KeyVaultClient.AuthenticationCallback(
+                azureServiceTokenProvider.KeyVaultTokenCallback));
 
-        public ConfigModel(IConfiguration config) {
+        private readonly string KeyVaultHostName;
+
+        private string oldIotHubServiceConnString;
+        private string oldAzureSphereDeviceConnString;
+
+        private SecretBundle bundle;
+
+        public ConfigModel(IConfiguration config) 
+        {
             _config = config;
+
+            iotHubServiceConnStringKey = _config.GetValue<String>("ConnectionStringKeys:iotHubService");
+            azureSphereDeviceConnStringKey = _config.GetValue<String>("ConnectionStringKeys:azureSphereDevice");
+
+            KeyVaultHostName = _config.GetValue<String>("KeyVaultName");
         }
 
         public async Task OnGetAsync() 
         {
-            var value = _config.GetValue<String>(iotHubServiceConnStringKey, "unset");
-            System.Diagnostics.Debug.WriteLine($"***** Get key '{iotHubServiceConnStringKey}', value: {value}");
+            try {
+                // Try to read 'iotHubServiceConnString' from KeyVault
+                bundle = await keyVaultClient.GetSecretAsync($"https://{KeyVaultHostName}.vault.azure.net/", iotHubServiceConnStringKey)
+                        .ConfigureAwait(false);
 
-            if (value == "unset") {
-                // IoT Hub Service Connection string Secret doesn't exist in KeyVault
+                IotHubServiceConnString = bundle.Value;
+                System.Diagnostics.Debug.WriteLine($"***** Get key '{iotHubServiceConnStringKey}', value: {IotHubServiceConnString}");
+            }
+            catch (KeyVaultErrorException kvex) {
+                if (kvex.Body.Error.Code.Equals("SecretNotFound")) {
+                    // IoT Hub Service Connection string Secret doesn't exist in KeyVault
+                    System.Diagnostics.Debug.WriteLine($"***** Creating key '{iotHubServiceConnStringKey}' in KeyVault");
 
-                System.Diagnostics.Debug.WriteLine($"***** Creating key '{iotHubServiceConnStringKey}' in KeyVault");
+                    // Create Secret in KeyVault
+                    // Note: In KeyVault key names replace ":" with "--"
+                    bundle = await keyVaultClient.SetSecretAsync(
+                        $"https://{KeyVaultHostName}.vault.azure.net/",
+                        iotHubServiceConnStringKey,
+                        "",
+                        null,
+                        "String");
 
-                AzureServiceTokenProvider azureServiceTokenProvider = new AzureServiceTokenProvider();
-
-                KeyVaultClient keyVaultClient = new KeyVaultClient(
-                    new KeyVaultClient.AuthenticationCallback(
-                        azureServiceTokenProvider.KeyVaultTokenCallback));
-
-                // Get KeyVault hostname from Configuration (appsettings.json)
-                var keyVaultHost = _config.GetValue<String>(configKeyVaultNameKey);
-
-                // Create Secret in KeyVault
-                var bundle = await keyVaultClient.SetSecretAsync(
-                    $"https://{keyVaultHost}.vault.azure.net/", 
-                    iotHubServiceConnStringKey.Replace(":","--"), 
-                    "")
-                    .ConfigureAwait(false);
-
+                    IotHubServiceConnString = "";
+                }
             }
 
-            /*
-            var secret = await keyVaultClient.GetSecretAsync($"https://{keyVaultHost}.vault.azure.net/secrets/AppSecret")
-                    .ConfigureAwait(false);
-              */
+            try {
+                // Try to read 'azureSphereDeviceConnString' from KeyVault
+                bundle = await keyVaultClient.GetSecretAsync($"https://{KeyVaultHostName}.vault.azure.net/", azureSphereDeviceConnStringKey)
+                        .ConfigureAwait(false);
 
+                AzureSphereDeviceConnString = bundle.Value;
+                System.Diagnostics.Debug.WriteLine($"***** Get key '{azureSphereDeviceConnStringKey}', value: {AzureSphereDeviceConnString}");
+            }
+            catch (KeyVaultErrorException kvex) {
+                if (kvex.Body.Error.Code.Equals("SecretNotFound")) {
+                    // IoT Hub Service Connection string Secret doesn't exist in KeyVault
+                    System.Diagnostics.Debug.WriteLine($"***** Creating key '{azureSphereDeviceConnStringKey}' in KeyVault");
+
+                    // Create Secret in KeyVault
+                    bundle = await keyVaultClient.SetSecretAsync(
+                        $"https://{KeyVaultHostName}.vault.azure.net/",
+                        azureSphereDeviceConnStringKey,
+                        "",
+                        null,
+                        "String");
+
+                    AzureSphereDeviceConnString = "";
+                }
+            }
+
+            oldIotHubServiceConnString = IotHubServiceConnString;
+            oldAzureSphereDeviceConnString = AzureSphereDeviceConnString;
         }
 
+        public async Task<IActionResult> OnPostAsync() {
+            if (!ModelState.IsValid) {
+                return Page();
+            }
+
+            if (InputId == "iothub") {
+                // IoT Hub Service ConnString was submitted
+                if (IotHubServiceConnString != oldIotHubServiceConnString) {
+                    // Update value in Key Vault
+                    var bundle = await keyVaultClient.SetSecretAsync(
+                        $"https://{KeyVaultHostName}.vault.azure.net/",
+                        iotHubServiceConnStringKey,
+                        IotHubServiceConnString,
+                        null,
+                        "String");
+                }
+            }
+            else if (InputId == "device") {
+                // Azure Sphere Device ConnString was submitted
+                if (AzureSphereDeviceConnString != oldAzureSphereDeviceConnString) {
+                    // Update value in Key Vault
+                    var bundle = await keyVaultClient.SetSecretAsync(
+                        $"https://{KeyVaultHostName}.vault.azure.net/",
+                        oldAzureSphereDeviceConnString,
+                        AzureSphereDeviceConnString,
+                        null,
+                        "String");
+                }
+            }
+
+            return RedirectToPage("/Config");
+        }
     }
 }
