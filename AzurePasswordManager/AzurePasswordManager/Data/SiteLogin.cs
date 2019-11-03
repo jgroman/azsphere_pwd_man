@@ -18,14 +18,14 @@ namespace AzurePasswordManager.Data {
         [Display(Name = "Site Name")]
         public string Name { get; set; }
 
-        [StringLength(100)]
-        public string Url { get; set; }
+        [Required]
+        [StringLength(50)]
+        public string Password { get; set; }
 
         [StringLength(50)]
         public string Username { get; set; }
 
-        [Required]
-        [StringLength(50)]
-        public string Password { get; set; }
+        [StringLength(100)]
+        public string Url { get; set; }
     }
 }

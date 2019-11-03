@@ -19,6 +19,9 @@ namespace AzurePasswordManager.Pages
 {
     public class SiteLoginEditModel : PageModel
     {
+        [BindProperty]
+        public SiteLogin SiteLogin { get; set; }
+
         private readonly AppDbContext _db;
         private readonly IConfiguration _config;
 
@@ -33,11 +36,11 @@ namespace AzurePasswordManager.Pages
         private readonly string KeyVaultHostName, KeyVaultBaseUrl;
 
         private readonly static string keyPrefix = "SL--";
-        private readonly static string keySuffixUrl = "--url";
         private readonly static string keySuffixUsername = "--username";
         private readonly static string keySuffixPassword = "--password";
+        private readonly static string keySuffixUrl = "--url";
 
-        private SiteLogin oldSiteLogin;
+        private static SiteLogin oldSiteLogin = new SiteLogin();
 
         private string keyUrl, keyUsername, keyPassword;
 
@@ -51,12 +54,9 @@ namespace AzurePasswordManager.Pages
             KeyVaultBaseUrl = $"https://{KeyVaultHostName}.vault.azure.net/";
         }
 
-        [BindProperty]
-        public SiteLogin SiteLogin { get; set; }
-
         public async Task<IActionResult> OnGetAsync(int id) 
         {
-            // Get SiteLogin name from db
+            // Get SiteLogin from db
             SiteLogin = await _db.SiteLogins.FindAsync(id);
 
             if (SiteLogin == null) {
@@ -104,12 +104,10 @@ namespace AzurePasswordManager.Pages
             }
 
             // Store current state
-            oldSiteLogin = new SiteLogin {
-                Name = SiteLogin.Name,
-                Username = SiteLogin.Username,
-                Password = SiteLogin.Password,
-                Url = SiteLogin.Url
-            };
+            oldSiteLogin.Name = SiteLogin.Name;
+            oldSiteLogin.Username = SiteLogin.Username;
+            oldSiteLogin.Password = SiteLogin.Password;
+            oldSiteLogin.Url = SiteLogin.Url;
 
             return Page();
         }
@@ -121,8 +119,100 @@ namespace AzurePasswordManager.Pages
                 return Page();
             }
 
-            // If siteName changed we will have to create new keyset
+            keyUsername = keyPrefix + SiteLogin.Name + keySuffixUsername;
+            keyPassword = keyPrefix + SiteLogin.Name + keySuffixPassword;
+            keyUrl = keyPrefix + SiteLogin.Name + keySuffixUrl;
 
+            string oldKeyUsername = keyPrefix + oldSiteLogin.Name + keySuffixUsername;
+            string oldKeyPassword = keyPrefix + oldSiteLogin.Name + keySuffixPassword;
+            string oldKeyUrl = keyPrefix + oldSiteLogin.Name + keySuffixUrl;
+
+            if (SiteLogin.Name.Equals(oldSiteLogin.Name)) {
+                // Updating existing site data
+
+                // Check username changes
+                if (string.IsNullOrEmpty(SiteLogin.Username)) { 
+                    if (!string.IsNullOrEmpty(oldSiteLogin.Username)) {
+                        // Username was erased, delete secret
+                        await keyVaultClient.DeleteSecretAsync(
+                            KeyVaultBaseUrl, oldKeyUsername);
+                    }
+                }
+                else {
+                    if (!SiteLogin.Username.Equals(oldSiteLogin.Username)) {
+                        // Username has changed, create/update secret
+                        await keyVaultClient.SetSecretAsync(
+                            KeyVaultBaseUrl, keyUsername, SiteLogin.Username);
+                    }
+                }
+
+                // Check password changes
+                if (string.IsNullOrEmpty(SiteLogin.Password)) {
+                    if (!string.IsNullOrEmpty(oldSiteLogin.Password)) {
+                        // Password was erased, delete secret
+                        // OK, we cannot erase password key as it is mandatory
+                        //await keyVaultClient.DeleteSecretAsync(
+                        //    KeyVaultBaseUrl, oldKeyPassword);
+                    }
+                }
+                else {
+                    if (!SiteLogin.Password.Equals(oldSiteLogin.Password)) {
+                        // Password has changed, create/update secret
+                        await keyVaultClient.SetSecretAsync(
+                            KeyVaultBaseUrl, keyPassword, SiteLogin.Password);
+                    }
+                }
+
+                // Check URL changes
+                if (string.IsNullOrEmpty(SiteLogin.Url)) {
+                    if (!string.IsNullOrEmpty(oldSiteLogin.Url)) {
+                        // URL was erased, delete secret
+                        await keyVaultClient.DeleteSecretAsync(
+                            KeyVaultBaseUrl, oldKeyUrl);
+                    }
+                }
+                else {
+                    if (!SiteLogin.Url.Equals(oldSiteLogin.Url)) {
+                        // URL has changed, create/update secret
+                        await keyVaultClient.SetSecretAsync(
+                            KeyVaultBaseUrl, keyUrl, SiteLogin.Url);
+                    }
+                }
+
+            }
+            else {
+                // SiteName was changed we will have to create completely new 
+                // keyset and delete old keys
+
+                // -- Remove old secrets
+                await keyVaultClient.DeleteSecretAsync(KeyVaultBaseUrl, oldKeyUsername);
+
+                bundle = await keyVaultClient.DeleteSecretAsync(
+                    KeyVaultBaseUrl, oldKeyPassword);
+
+                bundle = await keyVaultClient.DeleteSecretAsync(
+                    KeyVaultBaseUrl, oldKeyUrl);
+
+                // -- Create new secrets
+                if (!SiteLogin.Username.Equals(null)) {
+                    await keyVaultClient.SetSecretAsync(
+                        KeyVaultBaseUrl, keyUsername, SiteLogin.Username);
+                }
+
+                if (!SiteLogin.Password.Equals(null)) {
+                    await keyVaultClient.SetSecretAsync(
+                        KeyVaultBaseUrl, keyPassword, SiteLogin.Password);
+                }
+                else {
+                    await keyVaultClient.SetSecretAsync(
+                        KeyVaultBaseUrl, keyPassword, oldSiteLogin.Password);
+                }
+
+                if (!SiteLogin.Url.Equals(null)) {
+                    await keyVaultClient.SetSecretAsync(
+                        KeyVaultBaseUrl, keyUrl, SiteLogin.Url);
+                }
+            }
 
             _db.Attach(SiteLogin).State = EntityState.Modified;
 
