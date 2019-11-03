@@ -1,0 +1,49 @@
+﻿@page
+@model AzurePasswordManager.Pages.SiteLoginEditModel
+@{
+    ViewData["Title"] = "Edit Site Login";
+}
+
+<h1>Edit Site Login - @Model.SiteLogin.Id</h1>
+
+<form method="post">
+    <div asp-validation-summary="All"></div>
+    <input asp-for="SiteLogin.Id" type="hidden" />
+
+    <div>
+        <label asp-for="SiteLogin.Name"></label>
+        <div>
+            <input asp-for="SiteLogin.Name" />
+            <span asp-validation-for="SiteLogin.Name"></span>
+        </div>
+    </div>
+
+    <div>
+        <label asp-for="SiteLogin.Username"></label>
+        <div>
+            <input asp-for="SiteLogin.Username" />
+            <span asp-validation-for="SiteLogin.Username"></span>
+        </div>
+    </div>
+
+    <div>
+        <label asp-for="SiteLogin.Password"></label>
+        <div>
+            <input asp-for="SiteLogin.Password" />
+            <span asp-validation-for="SiteLogin.Password"></span>
+        </div>
+    </div>
+
+    <div>
+        <label asp-for="SiteLogin.Url"></label>
+        <div>
+            <input asp-for="SiteLogin.Url" />
+            <span asp-validation-for="SiteLogin.Url"></span>
+        </div>
+    </div>
+
+    <div>
+        <button type="submit">Save</button>
+    </div>
+
+</form>

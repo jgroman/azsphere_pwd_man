@@ -8,3 +8,30 @@
     <h1 class="display-4">Welcome</h1>
     <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
 </div>
+
+<h1>Site Logins</h1>
+<form method="post">
+    <table class="table">
+        <thead>
+            <tr>
+                <th>Name</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var siteLogin in Model.SiteLogins) {
+            <tr>
+                <td>@siteLogin.Name</td>
+                <td>
+                    <a asp-page="./SiteLoginEdit" asp-route-id="@siteLogin.Id">edit</a>
+                    <button type="submit" asp-page-handler="delete"
+                            asp-route-id="@siteLogin.Id">
+                        delete
+                    </button>
+                </td>
+            </tr>
+            }
+        </tbody>
+    </table>
+
+    <a asp-page="./SiteLoginCreate">Create</a>
+</form>

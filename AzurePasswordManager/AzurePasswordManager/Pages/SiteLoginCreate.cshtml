@@ -1,8 +1,16 @@
 ﻿@page
 @model AzurePasswordManager.Pages.SiteLoginCreateModel
 @{
-    ViewData["Title"] = "SiteLoginCreate";
+    ViewData["Title"] = "SiteLogin Create";
 }
 
 <h1>SiteLoginCreate</h1>
 
+<div asp-validation-summary="All"></div>
+<form method="POST">
+    <div>Name: <input asp-for="SiteLogin.Name" /></div>
+    <div>URL: <input asp-for="SiteLogin.Url" /></div>
+    <div>Username: <input asp-for="SiteLogin.Username" /></div>
+    <div>Password: <input asp-for="SiteLogin.Password" /></div>
+    <input type="submit" />
+</form>

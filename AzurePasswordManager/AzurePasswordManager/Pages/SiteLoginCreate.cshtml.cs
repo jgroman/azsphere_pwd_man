@@ -20,6 +20,17 @@ namespace AzurePasswordManager.Pages
         [BindProperty]
         public SiteLogin SiteLogin { get; set; }
 
+        public async Task<IActionResult> OnPostAsync() {
+            if (!ModelState.IsValid) {
+                return Page();
+            }
+
+            _db.SiteLogins.Add(SiteLogin);
+
+            await _db.SaveChangesAsync();
+
+            return RedirectToPage("/Index");
+        }
 
         public void OnGet()
         {
