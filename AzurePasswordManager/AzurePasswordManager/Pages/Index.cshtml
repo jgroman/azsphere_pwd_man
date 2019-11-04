@@ -22,6 +22,10 @@
             <tr>
                 <td>@siteLogin.Name</td>
                 <td>
+                    <button type="submit" asp-page-handler="send"
+                            asp-route-id="@siteLogin.Id">
+                        send
+                    </button>
                     <a asp-page="./SiteLoginEdit" asp-route-id="@siteLogin.Id">edit</a>
                     <button type="submit" asp-page-handler="delete"
                             asp-route-id="@siteLogin.Id">

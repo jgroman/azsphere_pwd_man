@@ -36,7 +36,7 @@ namespace AzurePasswordManager.Pages {
 
         private readonly static int SecretMaxResults = 25;
 
-        private readonly string KeyVaultHostName;
+        private readonly string KeyVaultHostName, KeyVaultBaseUrl;
 
         public IndexModel(AppDbContext db, IConfiguration config) 
         {
@@ -47,6 +47,7 @@ namespace AzurePasswordManager.Pages {
             azureSphereDeviceConnStringKey = _config.GetValue<String>("ConnectionStringKeys:azureSphereDevice");
 
             KeyVaultHostName = _config.GetValue<String>("KeyVaultName");
+            KeyVaultBaseUrl = $"https://{KeyVaultHostName}.vault.azure.net/";
         }
 
         public IList<SiteLogin> SiteLogins { get; private set; }
@@ -57,12 +58,16 @@ namespace AzurePasswordManager.Pages {
             string secretName, siteName;
             SiteLogin siteLogin;
 
+            string keyPrefix = _config.GetValue<String>("KeyStrings:prefix");
+            string keySuffixPassword = _config.GetValue<String>("KeyStrings:suffixPassword");
+
             // Remove all db rows
             // Note: can be slow when rows > 1000
             _db.SiteLogins.RemoveRange(_db.SiteLogins);
 
             // Load secrets from KeyVault
-            IPage<SecretItem> secrets = await keyVaultClient.GetSecretsAsync($"https://{KeyVaultHostName}.vault.azure.net/", SecretMaxResults)
+            IPage<SecretItem> secrets = await keyVaultClient.GetSecretsAsync(
+                KeyVaultBaseUrl, SecretMaxResults)
                 .ConfigureAwait(false);
 
             //System.Diagnostics.Debug.WriteLine($"***** Got secrets '{secrets.Count()}'");
@@ -78,15 +83,15 @@ namespace AzurePasswordManager.Pages {
                 // Only keys with the "--password" suffix are mandatory, we'll 
                 // use them as site name source
                 if ((secretName.Length > 14) && 
-                    secretName.StartsWith("SL--") &&
-                    secretName.EndsWith("--password")) 
+                    secretName.StartsWith(keyPrefix) &&
+                    secretName.EndsWith(keySuffixPassword))
                 {
-                    // Secret name format: "SL--sitename--password"
+                    // Key name format: "SL--sitename--password"
                     siteName = secretName.Substring(4);
                     splitMark = siteName.LastIndexOf("--");
                     siteName = siteName.Substring(0, splitMark);
 
-                    siteLogin = new SiteLogin {
+                    siteLogin = new SiteLogin() {
                         Name = siteName
                     };
 
@@ -112,12 +117,31 @@ namespace AzurePasswordManager.Pages {
 
             return RedirectToPage();
         }
+
+        public async Task<IActionResult> OnPostSendAsync(int id) {
+
+            var siteLogin = await _db.SiteLogins.FindAsync(id);
+
+            if (siteLogin == null) {
+                return RedirectToPage();
+            }
+
+            // Read siteLogin secrets from KeyVault
+            await siteLogin.ReadFromKeyVault(_config);
+
+            System.Diagnostics.Debug.WriteLine($"***** Got username '{siteLogin.Username}'");
+            System.Diagnostics.Debug.WriteLine($"***** Got password '{siteLogin.Password}'");
+            System.Diagnostics.Debug.WriteLine($"***** Got url '{siteLogin.Url}'");
+
+            // Get connection string secrets from KeyVault
+
+
+            return RedirectToPage();
+        }
+
     }
 
-    /*
-    public void OnGet() {
 
-    }
-    */
+
 }
 
