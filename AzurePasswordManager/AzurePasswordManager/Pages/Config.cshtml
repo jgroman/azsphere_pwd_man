@@ -1,30 +1,28 @@
 ﻿@page
 @model AzurePasswordManager.Pages.ConfigModel
+@section scripts{
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+}
 @{
-    ViewData["Title"] = "Config";
+    ViewData["Title"] = "Configuration";
 }
 
-<h1>Config</h1>
+<h1>Configuration</h1>
 
 <div asp-validation-summary="All"></div>
 <form method="POST">
     <div>
-        <label asp-for="IotHubServiceConnString" class="control-label"></label>
-        <input asp-for="IotHubServiceConnString"
-               value="@Model.IotHubServiceConnString" />
+        <label asp-for="ConnectionString.IotHubService" class="control-label"></label>
+        <input asp-for="ConnectionString.IotHubService"
+               value="@Model.ConnectionString.IotHubService" />
+        <span asp-validation-for="ConnectionString.IotHubService"></span>
     </div>
-    <input type="hidden" asp-for="InputId" value="iothub" />
-    <input type="submit" />
-</form>
-<h3>@ViewData["confirmation1"]</h3>
-
-<form method="POST">
     <div>
-        <label asp-for="AzureSphereDeviceConnString" class="control-label"></label>
-        <input asp-for="AzureSphereDeviceConnString"
-               value="@Model.AzureSphereDeviceConnString" />
+        <label asp-for="ConnectionString.AzureSphereDevice" class="control-label"></label>
+        <input asp-for="ConnectionString.AzureSphereDevice"
+               value="@Model.ConnectionString.AzureSphereDevice" />
+        <span asp-validation-for="ConnectionString.AzureSphereDevice"></span>
     </div>
-    <input type="hidden" asp-for="InputId" value="device" />
     <input type="submit" />
 </form>
-<h3>@ViewData["confirmation2"]</h3>
+<h3>@ViewData["confirmation"]</h3>

@@ -37,8 +37,6 @@ namespace AzurePasswordManager.Pages
 
         private static SiteLogin oldSiteLogin;
 
-        private SecretBundle bundle;
-
         public SiteLoginEditModel(AppDbContext db, IConfiguration config) {
             _db = db;
             _config = config;

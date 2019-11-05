@@ -4,12 +4,6 @@
     ViewData["Title"] = "Home page";
 }
 
-<div class="text-center">
-    <h1 class="display-4">Welcome</h1>
-    <p>Learn about <a href="https://docs.microsoft.com/aspnet/core">building Web apps with ASP.NET Core</a>.</p>
-</div>
-
-<h1>Site Logins</h1>
 <form method="post">
     <table class="table">
         <thead>
@@ -19,23 +13,30 @@
         </thead>
         <tbody>
             @foreach (var siteLogin in Model.SiteLogins) {
-            <tr>
-                <td>@siteLogin.Name</td>
-                <td>
-                    <button type="submit" asp-page-handler="send"
-                            asp-route-id="@siteLogin.Id">
-                        send
-                    </button>
-                    <a asp-page="./SiteLoginEdit" asp-route-id="@siteLogin.Id">edit</a>
-                    <button type="submit" asp-page-handler="delete"
-                            asp-route-id="@siteLogin.Id">
-                        delete
-                    </button>
-                </td>
-            </tr>
+                <tr>
+                    <td class="clicktd" id="clicktd-@siteLogin.Id">@siteLogin.Name <span id="result-@siteLogin.Id"></span></td>
+                    <td>
+                        <button type="submit" asp-page-handler="send"
+                                asp-route-id="@siteLogin.Id">
+                            send
+                        </button>
+                        <a asp-page="./SiteLoginEdit" asp-route-id="@siteLogin.Id">edit</a>
+                        <button type="submit" asp-page-handler="delete"
+                                asp-route-id="@siteLogin.Id">
+                            delete
+                        </button>
+                    </td>
+                </tr>
             }
         </tbody>
     </table>
-
-    <a asp-page="./SiteLoginCreate">Create</a>
 </form>
+
+@section scripts{
+    <script>
+        $('td.clicktd').click(function () {
+            var id = $(this).attr('id');
+            alert("CLICK");
+        });
+    </script>
+}

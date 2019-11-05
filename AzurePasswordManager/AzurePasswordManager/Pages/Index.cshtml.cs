@@ -15,6 +15,11 @@ using Microsoft.Azure.Services.AppAuthentication;
 
 using Microsoft.Extensions.Configuration;
 
+using Microsoft.Azure.Devices;
+using Microsoft.Azure.Devices.Common.Exceptions;
+
+using Newtonsoft.Json;
+
 namespace AzurePasswordManager.Pages {
 
     public class IndexModel : PageModel {
@@ -72,6 +77,8 @@ namespace AzurePasswordManager.Pages {
 
             //System.Diagnostics.Debug.WriteLine($"***** Got secrets '{secrets.Count()}'");
 
+            // TODO: Add loop for GetSecretsAsync
+
             // Store secrets in db
             foreach (SecretItem secret in secrets) 
             {
@@ -110,6 +117,8 @@ namespace AzurePasswordManager.Pages {
 
             var siteLogin = await _db.SiteLogins.FindAsync(id);
 
+            // TODO: delete keys
+
             if (siteLogin != null) {
                 _db.SiteLogins.Remove(siteLogin);
                 await _db.SaveChangesAsync();
@@ -127,14 +136,59 @@ namespace AzurePasswordManager.Pages {
             }
 
             // Read siteLogin secrets from KeyVault
-            await siteLogin.ReadFromKeyVault(_config);
-
-            System.Diagnostics.Debug.WriteLine($"***** Got username '{siteLogin.Username}'");
-            System.Diagnostics.Debug.WriteLine($"***** Got password '{siteLogin.Password}'");
-            System.Diagnostics.Debug.WriteLine($"***** Got url '{siteLogin.Url}'");
+            await siteLogin.ReadFromKeyVault(_config).ConfigureAwait(false);
 
             // Get connection string secrets from KeyVault
+            ConnectionString connectionString = new ConnectionString();
+            await connectionString.ReadFromKeyVault(_config).ConfigureAwait(false);
 
+            ServiceClient serviceClient;
+
+            // Prepare device method call via Iot Hub
+            try {
+                serviceClient = ServiceClient.CreateFromConnectionString(connectionString.IotHubService);
+            }
+            catch (FormatException fex) {
+                if (fex.Message.Equals("Malformed Token")) {
+                    // Invalid Iot Hub Service Connection String
+                    System.Diagnostics.Debug.WriteLine($"***** Malformed token");
+
+                }
+                return RedirectToPage();
+            }
+
+            string methodName = _config.GetValue<string>("AzureSphereDevice:directMethodName");
+            int methodTimeout = _config.GetValue<int>("AzureSphereDevice:directMethodCallTimeout");
+
+            var methodInvocation = new CloudToDeviceMethod(methodName) {
+                ResponseTimeout = TimeSpan.FromSeconds(methodTimeout)
+            };
+
+            methodInvocation.SetPayloadJson(JsonConvert.SerializeObject(siteLogin));
+
+            // Invoke the direct method asynchronously and get the response from IoT device.
+            try {
+                var response = await serviceClient.InvokeDeviceMethodAsync(connectionString.AzureSphereDevice, methodInvocation);
+                System.Diagnostics.Debug.WriteLine($"***** Response payload '{response.GetPayloadAsJson()}'");
+
+                // result = response.GetPayloadAsJson();
+            }
+            catch (DeviceNotFoundException dnfex) {
+                //System.Diagnostics.Debug.WriteLine($"***** EX: '{dnfex}'");
+
+                // errorCode 404001 - invalid name
+                // errorCode 404103 - timeout
+
+                if (dnfex.Message.Contains(":404001,")) {
+                    // Device not registered or incorrect name
+                    System.Diagnostics.Debug.WriteLine($"***** EX: Device not registered");
+                }
+                else if (dnfex.Message.Contains(":404103,")) {
+                    // Device not registered or incorrect name
+                    System.Diagnostics.Debug.WriteLine($"***** EX: Timeout connecting to device");
+                }
+
+            }
 
             return RedirectToPage();
         }

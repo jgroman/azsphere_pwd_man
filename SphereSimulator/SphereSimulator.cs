@@ -27,6 +27,7 @@ namespace sphere_simulator
         private static Task<MethodResponse> SetTelemetryInterval(MethodRequest methodRequest, object userContext)
         {
             var data = Encoding.UTF8.GetString(methodRequest.Data);
+            Console.WriteLine("{0} > Received message: {1}", DateTime.Now, data);
 
             // Check the payload is a single integer value
             if (Int32.TryParse(data, out s_telemetryInterval))
@@ -46,6 +47,16 @@ namespace sphere_simulator
                 return Task.FromResult(new MethodResponse(Encoding.UTF8.GetBytes(result), 400));
             }
         }
+
+        private static Task<MethodResponse> SetSiteLoginData(MethodRequest methodRequest, object userContext)
+        {
+            var data = Encoding.UTF8.GetString(methodRequest.Data);
+            Console.WriteLine("{0} > Received message: {1}", DateTime.Now, data);
+
+            string result = "{\"result\":\"OK\"}";
+            return Task.FromResult(new MethodResponse(Encoding.UTF8.GetBytes(result), 200));
+        }
+
 
         // Async method to send simulated telemetry
         private static async void SendDeviceToCloudMessagesAsync()
@@ -89,6 +100,10 @@ namespace sphere_simulator
 
             // Create a handler for the direct method call
             s_deviceClient.SetMethodHandlerAsync("SetTelemetryInterval", SetTelemetryInterval, null).Wait();
+
+            // Create a handler for the direct method call
+            s_deviceClient.SetMethodHandlerAsync("SetSiteLoginData", SetSiteLoginData, null).Wait();
+
 
             SendDeviceToCloudMessagesAsync();
             Console.ReadLine();

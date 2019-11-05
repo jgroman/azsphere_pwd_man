@@ -21,8 +21,7 @@ namespace AzurePasswordManager.Data {
         public int Id { get; set; }
 
         [Required]
-        [StringLength(30, ErrorMessage = "Site name cannot be longer than 30 characters.")]
-        [Display(Name = "Site Name")]
+        [StringLength(30, ErrorMessage = "Name cannot be longer than 30 characters.")]
         public string Name { get; set; }
 
         [Required]
@@ -32,6 +31,7 @@ namespace AzurePasswordManager.Data {
         [StringLength(50)]
         public string Username { get; set; }
 
+        [Url]
         [StringLength(100)]
         public string Url { get; set; }
 
