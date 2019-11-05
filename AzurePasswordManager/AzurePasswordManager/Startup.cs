@@ -13,6 +13,8 @@ using Microsoft.EntityFrameworkCore;
 
 using AzurePasswordManager.Data;
 
+using AzurePasswordManager.Services;
+
 namespace AzurePasswordManager {
 
     public class Startup {
@@ -36,6 +38,9 @@ namespace AzurePasswordManager {
                               options.UseInMemoryDatabase("name"));
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
+
+            services.AddMemoryCache();
+            services.AddTransient<ISecretItemService, SecretItemService>();
 
         }
 
