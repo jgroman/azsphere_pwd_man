@@ -14,6 +14,8 @@ using Microsoft.Azure.Services.AppAuthentication;
 using AzurePasswordManager.Models;
 using Microsoft.Rest.Azure;
 
+using Newtonsoft.Json;
+
 namespace AzurePasswordManager.Services {
 
     public interface IItemService {
@@ -40,7 +42,7 @@ namespace AzurePasswordManager.Services {
                 new KeyVaultClient.AuthenticationCallback(
                     azureServiceTokenProvider.KeyVaultTokenCallback));
 
-        private readonly string KeyVaultHostName, KeyVaultBaseUrl;
+        private readonly string KeyVaultHostName, KeyVaultBaseUrl, KeyPrefix;
 
         private readonly static int MaxGetSecretsResults = 25;
 
@@ -51,29 +53,23 @@ namespace AzurePasswordManager.Services {
 
             KeyVaultHostName = _config.GetValue<String>("KeyVaultName");
             KeyVaultBaseUrl = $"https://{KeyVaultHostName}.vault.azure.net/";
+
+            KeyPrefix = _config.GetValue<String>("KeyStrings:prefix");
         }
 
         public async Task<List<Item>> ReadAllAsync() {
 
-            int splitMark;
-            string secretName;
-
-            string keyPrefix = _config.GetValue<String>("KeyStrings:prefix");
-
             if (_cache.Get("ItemList") == null) {
 
+                int splitMark;
+                string secretName;
                 List<Item> items = new List<Item>();
                 Item item;
                 int itemId = 1;
 
                 // Load secrets from KeyVault
-                // Note: blocking call
                 IPage<SecretItem> secrets = await keyVaultClient.GetSecretsAsync(
                     KeyVaultBaseUrl, MaxGetSecretsResults);
-
-                // Using thread pool
-                // IPage<SecretItem> secrets = Task.Run(() => keyVaultClient.GetSecretsAsync(
-                //    KeyVaultBaseUrl, MaxGetSecretsResults)).Result;
 
                 // Store secrets in List
                 foreach (SecretItem secret in secrets) {
@@ -82,10 +78,8 @@ namespace AzurePasswordManager.Services {
                     secretName = secret.Id.Substring(splitMark + 1);
 
                     // Consider only keys with "SL--" prefix
-                    // Only keys with the "--password" suffix are mandatory, we'll 
-                    // use them as site name source
                     if ((secretName.Length > 4) &&
-                        secretName.StartsWith(keyPrefix)) {
+                        secretName.StartsWith(KeyPrefix)) {
 
                         item = new Item() {
                             // Key name format: "SL--itemname"
@@ -113,16 +107,30 @@ namespace AzurePasswordManager.Services {
                 var item = items.Single(c => c.Name == itemName);
             }
             catch (InvalidOperationException) {
+                // Didn't find exactly one item named <itemName>
+                // Item name doesn't exist
                 return false;
             }
             return true;
         }
 
-        public async Task CreateAsync(Item item) {
+        public async Task CreateAsync(Item newItem) {
+
+            string itemKey, itemJson;
+
             var items = await ReadAllAsync();
-            item.Id = items.Max(c => c.Id) + 1;
-            System.Diagnostics.Debug.WriteLine($"***** add name '{item.Name}'");
-            items.Add(item);
+
+            // Find Id for new item
+            newItem.Id = items.Max(c => c.Id) + 1;
+
+            // Add item to list
+            items.Add(newItem);
+
+            // Store item in KeyVault
+            itemKey = KeyPrefix + newItem.Name;
+            itemJson = JsonConvert.SerializeObject(newItem);
+            await keyVaultClient.SetSecretAsync(
+                KeyVaultBaseUrl, itemKey, itemJson);
 
             // Order list by name ascending
             List<Item> sortedItems = items.OrderBy(o => o.Name).ToList();
@@ -131,8 +139,37 @@ namespace AzurePasswordManager.Services {
         }
 
         public async Task<Item> ReadAsync(int id) {
+
+            string itemKey, secretJson;
+            SecretBundle bundle;
+
+            // Get item list
             List<Item> items = await ReadAllAsync();
-            return items.Single(c => c.Id == id);
+
+            // Check if item content was already loaded from KeyVault
+            // Since item.password is mandatory, we'll check if password is present
+            var item = items.Single(c => c.Id == id);
+
+            if (item.Password == null) {
+                itemKey = KeyPrefix + item.Name;
+
+                try {
+                    // Load item content from KeyVault
+                    bundle = await keyVaultClient.GetSecretAsync(
+                        KeyVaultBaseUrl, itemKey)
+                        .ConfigureAwait(false);
+
+                    secretJson = bundle.Value;
+                }
+                catch (KeyVaultErrorException) {
+                    secretJson = "{}";
+                }
+
+                //TODO - deserialize Json, update item
+
+            }
+
+            return item;
         }
 
         public async Task UpdateAsync(Item modifiedItem) {

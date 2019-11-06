@@ -8,10 +8,13 @@ using Microsoft.AspNetCore.Mvc;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
+using Newtonsoft.Json;
+
 namespace AzurePasswordManager.Models {
 
     public class Item {
 
+        [JsonIgnore]
         public int Id { get; set; }
 
         [Required]
