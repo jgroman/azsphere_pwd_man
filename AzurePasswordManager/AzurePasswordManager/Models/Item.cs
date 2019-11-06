@@ -26,7 +26,7 @@ namespace AzurePasswordManager.Models {
         [StringLength(50)]
         public string Username { get; set; }
 
-        [Url]
+        
         [StringLength(100)]
         public string Uri { get; set; }
 
