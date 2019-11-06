@@ -24,23 +24,23 @@ namespace AzurePasswordManager.Controllers
 
         // GET: api/item
         [HttpGet]
-        public IEnumerable<Item> Get()
+        public async Task<IEnumerable<Item>> GetAsync()
         {
-            return _itemService.ReadAll();
+            return await _itemService.ReadAllAsync();
         }
 
         // GET: api/item/5
         [HttpGet("{id}", Name = "Get")]
-        public Item Get(int id)
+        public async Task<Item> GetAsync(int id)
         {
-            return _itemService.Read(id);
+            return await _itemService.ReadAsync(id);
         }
 
         // POST: api/item
         [HttpPost]
-        public void Post([FromBody] Item item)
+        public async Task PostAsync([FromBody] Item item)
         {
-            _itemService.Create(item);
+            await _itemService.CreateAsync(item);
         }
 
         // POST: api/item/send/5
@@ -51,16 +51,16 @@ namespace AzurePasswordManager.Controllers
 
         // PUT: api/item/5
         [HttpPut("{id}")]
-        public void Put(int id, [FromBody] Item item)
+        public async Task PutAsync(int id, [FromBody] Item item)
         {
-            _itemService.Update(item);
+            await _itemService.UpdateAsync(item);
         }
 
         // DELETE: api/item/5
         [HttpDelete("{id}")]
-        public void Delete(int id)
+        public async Task DeleteAsync(int id)
         {
-            _itemService.Delete(id);
+            await _itemService.DeleteAsync(id);
         }
 
     }

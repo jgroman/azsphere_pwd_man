@@ -18,12 +18,12 @@ namespace AzurePasswordManager.Services {
 
     public interface IItemService {
 
-        List<Item> ReadAll();
-        bool CheckItemNameExists(string itemName);
-        void Create(Item item);
-        Item Read(int id);
-        void Update(Item modifiedItem);
-        void Delete(int id);
+        Task<List<Item>> ReadAllAsync();
+        Task<bool> CheckItemNameExistsAsync(string itemName);
+        Task CreateAsync(Item item);
+        Task<Item> ReadAsync(int id);
+        Task UpdateAsync(Item modifiedItem);
+        Task DeleteAsync(int id);
         void Send(int id);
     }
 
@@ -53,7 +53,7 @@ namespace AzurePasswordManager.Services {
             KeyVaultBaseUrl = $"https://{KeyVaultHostName}.vault.azure.net/";
         }
 
-        public List<Item> ReadAll() {
+        public async Task<List<Item>> ReadAllAsync() {
 
             int splitMark;
             string secretName;
@@ -68,8 +68,8 @@ namespace AzurePasswordManager.Services {
 
                 // Load secrets from KeyVault
                 // Note: blocking call
-                IPage<SecretItem> secrets = keyVaultClient.GetSecretsAsync(
-                    KeyVaultBaseUrl, MaxGetSecretsResults).Result;
+                IPage<SecretItem> secrets = await keyVaultClient.GetSecretsAsync(
+                    KeyVaultBaseUrl, MaxGetSecretsResults);
 
                 // Using thread pool
                 // IPage<SecretItem> secrets = Task.Run(() => keyVaultClient.GetSecretsAsync(
@@ -106,8 +106,8 @@ namespace AzurePasswordManager.Services {
             return _cache.Get<List<Item>>("ItemList");
         }
 
-        public bool CheckItemNameExists(string itemName) {
-            var items = ReadAll();
+        public async Task<bool> CheckItemNameExistsAsync(string itemName) {
+            var items = await ReadAllAsync();
             //System.Diagnostics.Debug.WriteLine($"***** check name '{itemName}'");
             try {
                 var item = items.Single(c => c.Name == itemName);
@@ -118,8 +118,8 @@ namespace AzurePasswordManager.Services {
             return true;
         }
 
-        public void Create(Item item) {
-            var items = ReadAll();
+        public async Task CreateAsync(Item item) {
+            var items = await ReadAllAsync();
             item.Id = items.Max(c => c.Id) + 1;
             System.Diagnostics.Debug.WriteLine($"***** add name '{item.Name}'");
             items.Add(item);
@@ -130,12 +130,13 @@ namespace AzurePasswordManager.Services {
             _cache.Set("ItemList", sortedItems);
         }
 
-        public Item Read(int id) {
-            return ReadAll().Single(c => c.Id == id);
+        public async Task<Item> ReadAsync(int id) {
+            List<Item> items = await ReadAllAsync();
+            return items.Single(c => c.Id == id);
         }
 
-        public void Update(Item modifiedItem) {
-            var items = ReadAll();
+        public async Task UpdateAsync(Item modifiedItem) {
+            var items = await ReadAllAsync();
             var item = items.Single(c => c.Id == modifiedItem.Id);
             item.Name = modifiedItem.Name;
             item.Username = modifiedItem.Username;
@@ -148,8 +149,8 @@ namespace AzurePasswordManager.Services {
             _cache.Set("ItemList", sortedItems);
         }
 
-        public void Delete(int id) {
-            var items = ReadAll();
+        public async Task DeleteAsync(int id) {
+            var items = await ReadAllAsync();
             var deletedItem = items.Single(c => c.Id == id);
             items.Remove(deletedItem);
             _cache.Set("ItemList", items);

@@ -20,8 +20,8 @@ namespace AzurePasswordManager.Controllers
         }
 
         [AcceptVerbs("Get", "Post")]
-        public IActionResult ValidateItemName([Bind(Prefix = "Item.Name")] string name) {
-            if (_itemService.CheckItemNameExists(name)) {
+        public async Task<IActionResult> ValidateItemNameAsync([Bind(Prefix = "Item.Name")] string name) {
+            if (await _itemService.CheckItemNameExistsAsync(name)) {
                 return Content("false", "application/json");
             }
             return Content("true", "application/json");
