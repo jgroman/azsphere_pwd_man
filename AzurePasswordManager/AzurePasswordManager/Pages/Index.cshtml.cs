@@ -18,12 +18,33 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Azure.Devices;
 using Microsoft.Azure.Devices.Common.Exceptions;
 
+using System.ComponentModel.DataAnnotations;
+
 using Newtonsoft.Json;
+
+using AzurePasswordManager.Models;
 
 namespace AzurePasswordManager.Pages {
 
     public class IndexModel : PageModel {
 
+        [BindProperty]
+        public Item Item { get; set; }
+
+        /*
+        public int Id { get; set; }
+
+        [Required]
+        public string Name { get; set; }
+
+        [Required]
+        public string Password { get; set; }
+
+        public string Username { get; set; }
+
+        public string Uri { get; set; }
+
+        /*
         private readonly AppDbContext _db;
 
         private readonly IConfiguration _config;
@@ -192,7 +213,7 @@ namespace AzurePasswordManager.Pages {
 
             return RedirectToPage();
         }
-
+        */
     }
 
 

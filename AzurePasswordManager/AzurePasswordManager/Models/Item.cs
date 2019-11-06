@@ -3,17 +3,20 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 
+using Microsoft.AspNetCore.Mvc;
+
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
 namespace AzurePasswordManager.Models {
 
-    public class SecretItem {
+    public class Item {
 
         public int Id { get; set; }
 
         [Required]
         [StringLength(30, ErrorMessage = "Name cannot be longer than 30 characters.")]
+        [Remote(action: "ValidateItemName", controller: "Validator", ErrorMessage = "Name already exists.")]
         public string Name { get; set; }
 
         [Required]
@@ -25,7 +28,7 @@ namespace AzurePasswordManager.Models {
 
         [Url]
         [StringLength(100)]
-        public string Url { get; set; }
+        public string Uri { get; set; }
 
     }
 

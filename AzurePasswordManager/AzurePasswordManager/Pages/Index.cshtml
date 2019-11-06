@@ -4,39 +4,189 @@
     ViewData["Title"] = "Home page";
 }
 
-<form method="post">
-    <table class="table">
-        <thead>
-            <tr>
-                <th>Name</th>
-            </tr>
-        </thead>
-        <tbody>
-            @foreach (var siteLogin in Model.SiteLogins) {
-                <tr>
-                    <td class="clicktd" id="clicktd-@siteLogin.Id">@siteLogin.Name <span id="result-@siteLogin.Id"></span></td>
-                    <td>
-                        <button type="submit" asp-page-handler="send"
-                                asp-route-id="@siteLogin.Id">
-                            send
-                        </button>
-                        <a asp-page="./SiteLoginEdit" asp-route-id="@siteLogin.Id">edit</a>
-                        <button type="submit" asp-page-handler="delete"
-                                asp-route-id="@siteLogin.Id">
-                            delete
-                        </button>
-                    </td>
-                </tr>
-            }
-        </tbody>
-    </table>
-</form>
+<div class="row" id="content">
+    <div class="col-lg-6">
+        <h3>All Items</h3>
+        <button class="btn btn-sm btn-default" id="new">Add New</button>
+        <ul id="item-list"></ul>
+    </div>
+    <div class="col-lg-6">
+        <div id="details"></div>
+        <div id="form">
+            <form class="form-horizontal">
+                <input type="hidden" asp-for="Item.Id" />
+
+                <div class="form-group">
+                    <label asp-for="Item.Name"></label>
+                    <input type="text" asp-for="Item.Name" class="form-control input-sm" />
+                    <span asp-validation-for="Item.Name"></span>
+                </div>
+                <div class="form-group">
+                    <label for="Username">Username</label>
+                    <input type="text" asp-for="Item.Username" class="form-control input-sm" />
+                    <span asp-validation-for="Item.Username"></span>
+                </div>
+                <div class="form-group">
+                    <label for="Password">Password</label>
+                    <input type="text" asp-for="Item.Password" class="form-control input-sm" />
+                    <span asp-validation-for="Item.Password"></span>
+                </div>
+                <div class="form-group">
+                    <label for="Url">Url</label>
+                    <input type="text" asp-for="Item.Uri" class="form-control input-sm" />
+                    <span asp-validation-for="Item.Uri"></span>
+                </div>
+                <div class="form-group">
+                    <button class="btn btn-primary btn-sm" id="save">Submit</button>
+                    <button class="btn btn-secondary btn-sm" id="cancel">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
 
 @section scripts{
-    <script>
-        $('td.clicktd').click(function () {
-            var id = $(this).attr('id');
-            alert("CLICK");
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+
+    <script type="text/javascript">
+        $(function () {
+
+            // On item entry click
+            $('#item-list').on('click', '.entry', function (e) {
+                e.preventDefault();
+                var id = $(this).attr('id');
+                alert("CLICK " + id);
+            });
+
+            // On item Send click
+            $('#item-list').on('click', '.send', function (e) {
+
+                var cmd = $(this);
+
+                var url = '/api/item/send/' + cmd.data('id');
+
+                var method = 'post';
+
+                $.ajax({
+                    type: method,
+                    url: url,
+                    data: "",
+                    contentType: 'application/json'
+                }).done(function () {
+                    alert("sent");
+                });
+            });
+
+            var loadItems = function () {
+
+                $('#item-list').empty();
+
+                $.get('/api/item').done(function (items) {
+                    $.each(items, function (i, item) {
+                        var itemPart = '<li>' +
+                            '<span class="entry" id="' + item.id + '"><strong>' + item.name + '</strong></span>' +
+                            '<span class="send" data-id="' + item.id + '">Send</span> |' +
+                            '<span class="details" data-id="' + item.id + '">Details</span> |' +
+                            '<span class="edit" data-id="' + item.id + '">Edit</span> |' +
+                            '<span class="delete" data-id="' + item.id + '">Delete</span>' +
+                        '</li>';
+                        $('#item-list').append(itemPart);
+                    });
+                });
+            }
+
+            var showForm = function () {
+                $(':input').val('');
+                $('#details').empty();
+                $('#form').show();
+            }
+
+            var clearForm = function () {
+                $('#details').empty();
+                $(':input').val('');
+                $('#form').hide();
+            }
+
+            $('#new').on('click', showForm);
+
+            clearForm();
+            loadItems();
+
+            $('#item-list').on('click', '.edit, .details', function () {
+
+                var cmd = $(this);
+
+                $.get(`/api/item/${cmd.data('id')}`).done(function (item) {
+                    if (cmd.hasClass('details')) {
+                        clearForm()
+                        $('#details').empty().append(
+                            '<h3>Details</h3>' +
+                            '<strong>' + item.name + '</strong><br>' +
+                            'Username:' + item.username + '<br>' +
+                            'Password:' + item.password + '<br>' +
+                            'Url:' + item.uri
+                        );
+                    } else {
+                        showForm();
+                        $('#Item_Id').val(item.id);
+                        $('#Item_Name').val(item.name);
+                        $('#Item_Username').val(item.username);
+                        $('#Item_Password').val(item.password);
+                        $('#Item_Uri').val(item.uri);
+                    }
+                });
+            });
+
+            // Item create/edit form -> Cancel
+            $('#cancel').on('click', function (e) {
+                e.preventDefault();
+                clearForm();
+            });
+
+            // Item create/edit form -> Submit
+            $('#save').on('click', function (e) {
+                //e.preventDefault();
+
+                var url = '/api/item/';
+
+                var method = 'post';
+
+                if ($('#Item_Id').val() !== '') {
+                    url += $('#Item_Id').val();
+                    method = 'put';
+                }
+
+                var secretItem = {};
+
+                $.each($(this).closest('form').serializeArray(), function () {
+                    if (this.name !== 'Item.Id' || (this.name === 'Item.Id' && this.value !== '')) {
+                        // Trim "Item." from the beginning
+                        secretItem[this.name.substring(5)] = this.value || '';
+                    }
+                });
+
+                $.ajax({
+                    type: method,
+                    url: url,
+                    data: JSON.stringify(secretItem),
+                    contentType: 'application/json'
+                }).done(function () {
+                    clearForm();
+                    loadItems();
+                });
+            });
+
+            // Item delete
+            $('#item-list').on('click', '.delete', function () {
+                $.ajax({
+                    type: 'delete',
+                    url: '/api/item/' + $(this).data('id'),
+                }).done(function () {
+                    clearForm();
+                    loadItems();
+                });
+            });
         });
     </script>
 }

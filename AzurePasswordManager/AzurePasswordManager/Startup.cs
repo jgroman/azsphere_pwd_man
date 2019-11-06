@@ -34,13 +34,13 @@ namespace AzurePasswordManager {
             });
 
             // DB
-            services.AddDbContext<AppDbContext>(options =>
-                              options.UseInMemoryDatabase("name"));
+            //services.AddDbContext<AppDbContext>(options =>
+            //                  options.UseInMemoryDatabase("name"));
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 
             services.AddMemoryCache();
-            services.AddTransient<ISecretItemService, SecretItemService>();
+            services.AddTransient<IItemService, ItemService>();
 
         }
 
