@@ -41,7 +41,7 @@ namespace AzurePasswordManager {
 
             services.AddMemoryCache();
             services.AddTransient<IItemService, ItemService>();
-
+            services.AddTransient<IConfigDataService, ConfigDataService>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

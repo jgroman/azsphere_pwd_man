@@ -43,12 +43,6 @@ namespace AzurePasswordManager.Controllers
             await _itemService.CreateAsync(item);
         }
 
-        // POST: api/item/send/5
-        [HttpPost("send/{id}")]
-        public void Send(int id) {
-            _itemService.Send(id);
-        }
-
         // PUT: api/item/5
         [HttpPut("{id}")]
         public async Task PutAsync(int id, [FromBody] Item item)

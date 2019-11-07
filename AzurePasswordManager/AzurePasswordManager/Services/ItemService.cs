@@ -15,6 +15,8 @@ using AzurePasswordManager.Models;
 using Microsoft.Rest.Azure;
 
 using Newtonsoft.Json;
+using System.Net.Http;
+using Microsoft.Rest;
 
 namespace AzurePasswordManager.Services {
 
@@ -26,13 +28,14 @@ namespace AzurePasswordManager.Services {
         Task<Item> ReadAsync(int id);
         Task UpdateAsync(Item modifiedItem);
         Task DeleteAsync(int id);
-        void Send(int id);
+        Task<bool> SendAsync(int id);
     }
 
     public class ItemService : IItemService {
 
         private readonly IConfiguration _config;
         private readonly IMemoryCache _cache;
+        private readonly IConfigDataService _configDataService;
 
         private static AzureServiceTokenProvider azureServiceTokenProvider =
             new AzureServiceTokenProvider();
@@ -42,19 +45,20 @@ namespace AzurePasswordManager.Services {
                 new KeyVaultClient.AuthenticationCallback(
                     azureServiceTokenProvider.KeyVaultTokenCallback));
 
-        private readonly string KeyVaultHostName, KeyVaultBaseUrl, KeyPrefix;
+        private readonly string KeyVaultHostName, KeyVaultBaseUrl, ConfigKeyPrefix;
 
         private readonly static int MaxGetSecretsResults = 25;
 
 
-        public ItemService(IConfiguration config, IMemoryCache cache) {
+        public ItemService(IConfiguration config, IMemoryCache cache, IConfigDataService configDataService) {
             _config = config;
             _cache = cache;
+            _configDataService = configDataService;
 
             KeyVaultHostName = _config.GetValue<String>("KeyVaultName");
             KeyVaultBaseUrl = $"https://{KeyVaultHostName}.vault.azure.net/";
 
-            KeyPrefix = _config.GetValue<String>("KeyStrings:prefix");
+            ConfigKeyPrefix = _config.GetValue<String>("ConfigKeys:prefix");
         }
 
         public async Task<List<Item>> ReadAllAsync() {
@@ -68,28 +72,31 @@ namespace AzurePasswordManager.Services {
                 int itemId = 1;
 
                 // Load secrets from KeyVault
-                IPage<SecretItem> secrets = await keyVaultClient.GetSecretsAsync(
-                    KeyVaultBaseUrl, MaxGetSecretsResults);
+                try {
+                    var secrets = await keyVaultClient.GetSecretsAsync(
+                        KeyVaultBaseUrl, MaxGetSecretsResults);
 
-                // Store secrets in List
-                foreach (SecretItem secret in secrets) {
-                    // Secret name follows after the last forward slash in secret.Id
-                    splitMark = secret.Id.LastIndexOf('/');
-                    secretName = secret.Id.Substring(splitMark + 1);
+                    // Get items and store them in List
+                    foreach (SecretItem secret in secrets) {
+                        // Secret name follows after the last forward slash in secret.Id
+                        splitMark = secret.Id.LastIndexOf('/');
+                        secretName = secret.Id.Substring(splitMark + 1);
 
-                    // Consider only keys with "SL--" prefix
-                    if ((secretName.Length > 4) &&
-                        secretName.StartsWith(KeyPrefix)) {
+                        // Skip prefixed configuration keys 
+                        if (!secretName.StartsWith(ConfigKeyPrefix)) {
 
-                        item = new Item() {
-                            // Key name format: "SL--itemname"
-                            Id = itemId,
-                            Name = secretName.Substring(4)
-                        };
+                            item = new Item() {
+                                Id = itemId,
+                                Name = secretName
+                            };
 
-                        items.Add(item);
-                        itemId++;
+                            items.Add(item);
+                            itemId++;
+                        }
                     }
+
+                }
+                catch (HttpRequestException) {
                 }
 
                 // Order list by name ascending
@@ -107,7 +114,6 @@ namespace AzurePasswordManager.Services {
                 var item = items.Single(c => c.Name == itemName);
             }
             catch (InvalidOperationException) {
-                // Didn't find exactly one item named <itemName>
                 // Item name doesn't exist
                 return false;
             }
@@ -116,85 +122,147 @@ namespace AzurePasswordManager.Services {
 
         public async Task CreateAsync(Item newItem) {
 
-            string itemKey, itemJson;
+            // Ignore items with no name
+            if (string.IsNullOrEmpty(newItem.Name)) {
+                return;
+            }
 
+            // Get cached list of all items
             var items = await ReadAllAsync();
 
-            // Find Id for new item
+            // Compute Id for new item
             newItem.Id = items.Max(c => c.Id) + 1;
 
             // Add item to list
             items.Add(newItem);
 
             // Store item in KeyVault
-            itemKey = KeyPrefix + newItem.Name;
-            itemJson = JsonConvert.SerializeObject(newItem);
-            await keyVaultClient.SetSecretAsync(
-                KeyVaultBaseUrl, itemKey, itemJson);
+            string itemJson = JsonConvert.SerializeObject(newItem);
 
-            // Order list by name ascending
-            List<Item> sortedItems = items.OrderBy(o => o.Name).ToList();
-
-            _cache.Set("ItemList", sortedItems);
-        }
-
-        public async Task<Item> ReadAsync(int id) {
-
-            string itemKey, secretJson;
-            SecretBundle bundle;
-
-            // Get item list
-            List<Item> items = await ReadAllAsync();
-
-            // Check if item content was already loaded from KeyVault
-            // Since item.password is mandatory, we'll check if password is present
-            var item = items.Single(c => c.Id == id);
-
-            if (item.Password == null) {
-                itemKey = KeyPrefix + item.Name;
-
-                try {
-                    // Load item content from KeyVault
-                    bundle = await keyVaultClient.GetSecretAsync(
-                        KeyVaultBaseUrl, itemKey)
-                        .ConfigureAwait(false);
-
-                    secretJson = bundle.Value;
-                }
-                catch (KeyVaultErrorException) {
-                    secretJson = "{}";
-                }
-
-                //TODO - deserialize Json, update item
-
+            try {
+                await keyVaultClient.SetSecretAsync(
+                    KeyVaultBaseUrl, newItem.Name, itemJson);
+            }
+            catch(ValidationException) {
             }
 
-            return item;
-        }
-
-        public async Task UpdateAsync(Item modifiedItem) {
-            var items = await ReadAllAsync();
-            var item = items.Single(c => c.Id == modifiedItem.Id);
-            item.Name = modifiedItem.Name;
-            item.Username = modifiedItem.Username;
-            item.Password = modifiedItem.Password;
-            item.Uri = modifiedItem.Uri;
-
-            // Order list by name ascending
+            // Order item list by name ascending
             List<Item> sortedItems = items.OrderBy(o => o.Name).ToList();
 
+            // Update item cache
             _cache.Set("ItemList", sortedItems);
         }
 
         public async Task DeleteAsync(int id) {
+            // Get cached list of all items
             var items = await ReadAllAsync();
+
+            // Get item to delete
             var deletedItem = items.Single(c => c.Id == id);
+
+            // Remove item from cached list
             items.Remove(deletedItem);
+
+            // Update cached list, no reorder necessary
             _cache.Set("ItemList", items);
+
+            // Remove item from KeyVault
+            await keyVaultClient.DeleteSecretAsync(
+                KeyVaultBaseUrl, deletedItem.Name);
         }
 
-        public void Send(int id) {
-            System.Diagnostics.Debug.WriteLine($"***** Sending '{id}'");
+        public async Task<Item> ReadAsync(int id) {
+
+            // Get cached list of all items
+            List<Item> items = await ReadAllAsync();
+
+            // Check if item content was already loaded from KeyVault
+            // Since item.Password is mandatory, we'll check if password is present
+            Item currentItem = items.Single(c => c.Id == id);
+
+            if (string.IsNullOrEmpty(currentItem.Password)) {
+
+                string itemJson;
+
+                // Load full item content JSON from KeyVault
+                try {
+                    SecretBundle bundle = await keyVaultClient.GetSecretAsync(
+                        KeyVaultBaseUrl, currentItem.Name)
+                        .ConfigureAwait(false);
+
+                    itemJson = bundle.Value;
+                }
+                catch (KeyVaultErrorException) {
+                    itemJson = "{}";
+                }
+
+                // Get item from JSON
+                try {
+                    var fullItem = JsonConvert.DeserializeObject<Item>(itemJson);
+
+                    // Update item in cached list, no name change
+                    fullItem.Id = currentItem.Id;
+                    await UpdateAsync(fullItem);
+                }
+                catch (JsonReaderException) {
+                }
+
+                // Get full item data from cached list
+                currentItem = items.Single(c => c.Id == id);
+            }
+
+            return currentItem;
+        }
+
+        public async Task UpdateAsync(Item modifiedItem) {
+            
+            if (string.IsNullOrEmpty(modifiedItem.Name)) {
+                return;
+            }
+            
+            // Get cached list of all items
+            var items = await ReadAllAsync();
+
+            // Get current item state from the list
+            var item = items.Single(c => c.Id == modifiedItem.Id);
+
+            // If item name changed, recreate item including KeyVault secrets
+            if (item.Name != modifiedItem.Name) {
+                // Delete current item
+                await DeleteAsync(item.Id);
+
+                // Create new item
+                await CreateAsync(modifiedItem);
+            }
+            else {
+                // Update all item properties except for Name and Id
+                item.Username = modifiedItem.Username;
+                item.Password = modifiedItem.Password;
+                item.Uri = modifiedItem.Uri;
+
+                // Update cached list
+                _cache.Set("ItemList", items);
+
+                // Update item in KeyVault
+                string itemJson = JsonConvert.SerializeObject(item);
+                await keyVaultClient.SetSecretAsync(
+                    KeyVaultBaseUrl, item.Name, itemJson);
+            }
+        }
+
+        public async Task<bool> SendAsync(int id) {
+
+            // Obtain IoT Hub connection string and Azure Sphere device name
+            ConfigData configData = await _configDataService.ReadAsync();
+
+            // Get full item content
+            Item item = await ReadAsync(id);
+
+            string itemJson = JsonConvert.SerializeObject(item);
+
+
+
+            return true;
         }
 
     }

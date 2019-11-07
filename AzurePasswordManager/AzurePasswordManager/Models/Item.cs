@@ -1,38 +1,28 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
+﻿using System.ComponentModel.DataAnnotations;
 
 using Microsoft.AspNetCore.Mvc;
-
-using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
-
-using Newtonsoft.Json;
 
 namespace AzurePasswordManager.Models {
 
     public class Item {
 
-        [JsonIgnore]
         public int Id { get; set; }
 
         [Required]
         [StringLength(30, ErrorMessage = "Name cannot be longer than 30 characters.")]
+        [RegularExpression(@".*[a-zA-Z0-9\-]$", ErrorMessage = "Alphanumeric characters and dashes only.")]
         [Remote(action: "ValidateItemNameAsync", controller: "Validator", ErrorMessage = "Name already exists.")]
         public string Name { get; set; }
 
         [Required]
-        [StringLength(50)]
+        [StringLength(50, ErrorMessage = "Password cannot be longer than 50 characters.")]
         public string Password { get; set; }
 
-        [StringLength(50)]
+        [StringLength(50, ErrorMessage = "Username cannot be longer than 50 characters.")]
         public string Username { get; set; }
 
-        
-        [StringLength(100)]
+        [StringLength(100, ErrorMessage = "URL cannot be longer than 100 characters.")]
         public string Uri { get; set; }
-
     }
 
 }
