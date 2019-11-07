@@ -11,20 +11,21 @@
 
     <div asp-validation-summary="All" class="offset-sm-1"></div>
 
-    <div class="form-group row">
-        <label asp-for="ConfigData.IotHubService" class="col-sm-3 col-form-label"></label>
-        <div class="col-sm-7">
-            <input asp-for="ConfigData.IotHubService"
-                   value="@Model.ConfigData.IotHubService" />
+
+    <div class="input-group mb-3">
+        <div class="input-group-prepend">
+            <label class="input-group-text" asp-for="ConfigData.IotHubService"></label>
         </div>
+        <textarea class="form-control" asp-for="ConfigData.IotHubService"
+                  value="@Model.ConfigData.IotHubService"></textarea>
     </div>
 
-    <div class="form-group row">
-        <label asp-for="ConfigData.AzureSphereDevice" class="col-sm-3 col-form-label"></label>
-        <div class="col-sm-7">
-            <input asp-for="ConfigData.AzureSphereDevice"
-                   value="@Model.ConfigData.AzureSphereDevice" />
+    <div class="input-group mb-3">
+        <div class="input-group-prepend">
+            <label class="input-group-text" asp-for="ConfigData.AzureSphereDevice"></label>
         </div>
+        <input type="text" class="form-control" asp-for="ConfigData.AzureSphereDevice"
+                   value="@Model.ConfigData.AzureSphereDevice" />
     </div>
 
     <div class="col-sm-1 offset-sm-1">
