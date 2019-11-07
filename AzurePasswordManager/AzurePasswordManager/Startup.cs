@@ -9,9 +9,6 @@ using Microsoft.AspNetCore.HttpsPolicy;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.EntityFrameworkCore;
-
-using AzurePasswordManager.Data;
 
 using AzurePasswordManager.Services;
 
@@ -32,10 +29,6 @@ namespace AzurePasswordManager {
                 options.CheckConsentNeeded = context => false;
                 options.MinimumSameSitePolicy = SameSiteMode.None;
             });
-
-            // DB
-            //services.AddDbContext<AppDbContext>(options =>
-            //                  options.UseInMemoryDatabase("name"));
 
             services.AddMvc().SetCompatibilityVersion(CompatibilityVersion.Version_2_2);
 

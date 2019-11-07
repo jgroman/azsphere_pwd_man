@@ -12,18 +12,18 @@
     <div asp-validation-summary="All" class="offset-sm-1"></div>
 
     <div class="form-group row">
-        <label asp-for="ConnectionString.IotHubService" class="col-sm-3 col-form-label"></label>
+        <label asp-for="ConfigData.IotHubService" class="col-sm-3 col-form-label"></label>
         <div class="col-sm-7">
-            <input asp-for="ConnectionString.IotHubService"
-                   value="@Model.ConnectionString.IotHubService" />
+            <input asp-for="ConfigData.IotHubService"
+                   value="@Model.ConfigData.IotHubService" />
         </div>
     </div>
 
     <div class="form-group row">
-        <label asp-for="ConnectionString.AzureSphereDevice" class="col-sm-3 col-form-label"></label>
+        <label asp-for="ConfigData.AzureSphereDevice" class="col-sm-3 col-form-label"></label>
         <div class="col-sm-7">
-            <input asp-for="ConnectionString.AzureSphereDevice"
-                   value="@Model.ConnectionString.AzureSphereDevice" />
+            <input asp-for="ConfigData.AzureSphereDevice"
+                   value="@Model.ConfigData.AzureSphereDevice" />
         </div>
     </div>
 

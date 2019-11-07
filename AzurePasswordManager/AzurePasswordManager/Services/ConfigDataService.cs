@@ -16,12 +16,8 @@ using System.Net.Http;
 namespace AzurePasswordManager.Services {
 
     public interface IConfigDataService {
-
         Task<ConfigData> ReadAsync();
-
-        //Task<string> GetIotHubServiceConnString();
-        //Task SetIotHubServiceConnString(string connString);
-
+        Task WriteAsync(ConfigData configData);
     }
 
     public class ConfigDataService : IConfigDataService {
@@ -102,6 +98,38 @@ namespace AzurePasswordManager.Services {
             return _cache.Get<ConfigData>("ConfigData");
         }
 
+        public async Task WriteAsync(ConfigData configData) {
+            bool updateCache = false;
+            ConfigData oldConfigData = _cache.Get<ConfigData>("ConfigData");
+
+            if (!string.IsNullOrEmpty(configData.IotHubService) && 
+                (configData.IotHubService != oldConfigData.IotHubService)) {
+                // Update IoT Hub Service Connection String in KeyVault
+                updateCache = true;
+                try {
+                    await keyVaultClient.SetSecretAsync(
+                            KeyVaultBaseUrl, ConfigKeyPrefix + IotHubServiceKey, configData.IotHubService);
+                }
+                catch (KeyVaultErrorException) {
+                }
+            }
+
+            if (!string.IsNullOrEmpty(configData.AzureSphereDevice) &&
+                (configData.AzureSphereDevice != oldConfigData.AzureSphereDevice)) {
+                // Update Azure Sphere Device Name in KeyVault
+                updateCache = true;
+                try {
+                    await keyVaultClient.SetSecretAsync(
+                            KeyVaultBaseUrl, ConfigKeyPrefix + AzureSphereDeviceKey, configData.AzureSphereDevice);
+                }
+                catch (KeyVaultErrorException) {
+                }
+            }
+
+            if (updateCache) {
+                _cache.Set("ConfigData", configData);
+            }
+        }
 
     }
 

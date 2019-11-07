@@ -1,34 +1,34 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Net.Http;
 using System.Threading.Tasks;
 
-
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Caching.Memory;
-
+using Microsoft.Azure.Devices;
+using Microsoft.Azure.Devices.Common.Exceptions;
 using Microsoft.Azure.KeyVault;
 using Microsoft.Azure.KeyVault.Models;
 using Microsoft.Azure.Services.AppAuthentication;
 
-using AzurePasswordManager.Models;
-using Microsoft.Rest.Azure;
+using Microsoft.Extensions.Caching.Memory;
+using Microsoft.Extensions.Configuration;
+
+using Microsoft.Rest;
 
 using Newtonsoft.Json;
-using System.Net.Http;
-using Microsoft.Rest;
+
+using AzurePasswordManager.Models;
 
 namespace AzurePasswordManager.Services {
 
     public interface IItemService {
-
         Task<List<Item>> ReadAllAsync();
         Task<bool> CheckItemNameExistsAsync(string itemName);
         Task CreateAsync(Item item);
         Task<Item> ReadAsync(int id);
         Task UpdateAsync(Item modifiedItem);
         Task DeleteAsync(int id);
-        Task<bool> SendAsync(int id);
+        Task<string> SendAsync(int id);
     }
 
     public class ItemService : IItemService {
@@ -250,19 +250,61 @@ namespace AzurePasswordManager.Services {
             }
         }
 
-        public async Task<bool> SendAsync(int id) {
-
-            // Obtain IoT Hub connection string and Azure Sphere device name
-            ConfigData configData = await _configDataService.ReadAsync();
+        public async Task<string> SendAsync(int id) {
 
             // Get full item content
             Item item = await ReadAsync(id);
 
-            string itemJson = JsonConvert.SerializeObject(item);
+            // Obtain IoT Hub connection string and Azure Sphere device name
+            ConfigData configData = await _configDataService.ReadAsync();
 
+            ServiceClient serviceClient;
 
+            // Prepare device method call via Iot Hub
+            try {
+                serviceClient = ServiceClient.CreateFromConnectionString(configData.IotHubService);
+            }
+            catch (FormatException fex) {
+                if (fex.Message.Equals("Malformed Token")) {
+                    // Invalid Iot Hub Service Connection String
+                    return JsonConvert.SerializeObject("Invalid Iot Hub Service Connection String");
+                }
+                return JsonConvert.SerializeObject("Message Format Exception");
+            }
 
-            return true;
+            string methodName = _config.GetValue<string>("AzureSphereDevice:directMethodName");
+            int methodTimeout = _config.GetValue<int>("AzureSphereDevice:directMethodCallTimeout");
+
+            var methodInvocation = new CloudToDeviceMethod(methodName) {
+                ResponseTimeout = TimeSpan.FromSeconds(methodTimeout)
+            };
+
+            methodInvocation.SetPayloadJson(JsonConvert.SerializeObject(item));
+
+            // Invoke the direct method asynchronously and get the response from IoT device.
+            try {
+                var response = await serviceClient.InvokeDeviceMethodAsync(configData.AzureSphereDevice, methodInvocation);
+                System.Diagnostics.Debug.WriteLine($"***** Response payload '{response.GetPayloadAsJson()}'");
+            }
+            catch (DeviceNotFoundException dnfex) {
+                //System.Diagnostics.Debug.WriteLine($"***** EX: '{dnfex}'");
+
+                if (dnfex.Message.Contains(":404001,")) {
+                    // errorCode 404001: Device not registered or incorrect name
+                    return JsonConvert.SerializeObject("Device not registered");
+                }
+                else if (dnfex.Message.Contains(":404103,")) {
+                    // errorCode 404103: Timeout
+                    return JsonConvert.SerializeObject("Timeout connecting to device");
+                }
+
+                return JsonConvert.SerializeObject("Device not found");
+            }
+
+            // TODO process response
+            // result = response.GetPayloadAsJson();
+
+            return JsonConvert.SerializeObject("true");
         }
 
     }

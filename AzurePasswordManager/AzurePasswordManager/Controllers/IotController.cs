@@ -20,7 +20,7 @@ namespace AzurePasswordManager.Controllers
 
         // POST: api/iot/send/5
         [HttpPost("send/{id}")]
-        public async Task<bool> SendAsync(int id) {
+        public async Task<string> SendAsync(int id) {
             return await _itemService.SendAsync(id);
         }
 

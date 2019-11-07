@@ -4,33 +4,31 @@ using Microsoft.AspNetCore.Mvc.RazorPages;
 
 using Microsoft.Extensions.Configuration;
 
-using AzurePasswordManager.Data;
+using AzurePasswordManager.Models;
+using AzurePasswordManager.Services;
 
 namespace AzurePasswordManager.Pages
 {
     public class ConfigModel : PageModel
     {
         [BindProperty]
-        public ConnectionString ConnectionString { get; set; }
+        public ConfigData ConfigData { get; set; }
 
         private readonly IConfiguration _config;
+        private readonly IConfigDataService _configDataService;
 
-        private static ConnectionString oldConnectionString = new ConnectionString();
-
-        public ConfigModel(IConfiguration config) 
+        public ConfigModel(IConfiguration config, IConfigDataService configDataService) 
         {
             _config = config;
-            ConnectionString = new ConnectionString();
+            _configDataService = configDataService;
+
+            ConfigData = new ConfigData();
         }
 
         public async Task OnGetAsync() {
 
-            // Read connection strings from KeyVault
-            await ConnectionString.ReadFromKeyVault(_config).ConfigureAwait(false);
-
-            // Store current state
-            oldConnectionString.IotHubService = ConnectionString.IotHubService;
-            oldConnectionString.AzureSphereDevice = ConnectionString.AzureSphereDevice;
+            // Read ConfigData
+            ConfigData = await _configDataService.ReadAsync();
         }
 
         public async Task<IActionResult> OnPostAsync() {
@@ -39,9 +37,8 @@ namespace AzurePasswordManager.Pages
                 return Page();
             }
 
-            // Write only updated connection strings to KeyVault
-            await ConnectionString.WriteToKeyVault(_config, oldConnectionString)
-                .ConfigureAwait(false);
+            // Update KeyVault secrets and cache
+            await _configDataService.WriteAsync(ConfigData);
 
             return RedirectToPage("/Index");
         }
