@@ -1,0 +1,91 @@
+﻿@page
+@model IndexModel
+@{
+    ViewData["Title"] = "Home page";
+}
+
+<div class="row" id="content">
+    <div class="col-lg-6">
+        <h3>All Items</h3>
+        <ul id="item-list" class="list-group list-group-flush"></ul>
+    </div>
+</div>
+
+@section scripts{
+    <script type="text/javascript">
+        $(function () {
+
+            var showLoadingIndicator = function () {
+                $('.loading').show();
+            }
+
+            var hideLoadingIndicator = function () {
+                $('.loading').hide();
+            }
+
+            // On item entry click
+            $('#item-list').on('click', '.entry', function (e) {
+                e.preventDefault();
+                var id = $(this).attr('id');
+                alert("CLICK " + id);
+            });
+
+            // On item Send click
+            $('#item-list').on('click', '.send', function (e) {
+
+                var cmd = $(this);
+
+                var url = '/api/iot/send/' + cmd.data('id');
+
+                var method = 'post';
+
+                $.ajax({
+                    type: method,
+                    url: url,
+                    data: "",
+                    contentType: 'application/json'
+                }).done(function () {
+                    alert("sent");
+                });
+            });
+
+            var loadItems = function () {
+                showLoadingIndicator();
+
+                // Clear item list
+                $('#item-list').empty();
+
+                // Obtain items via API call
+                $.get('/api/item').done(function (items) {
+                    $.each(items, function (i, item) {
+                        var itemPart = '<li class="list-group-item">' +
+                            '<span class="entry" id="' + item.id + '"><h3>' + item.name + '</h3></span>' +
+                            '<span class="send" data-id="' + item.id + '">Send</span>' +
+                            '<button class="btn-sm btn-outline-primary float-right" id="btn-edit" data-id="' + item.id + '">Edit</button>' +
+                        '</li>';
+                        $('#item-list').append(itemPart);
+
+                    });
+                    hideLoadingIndicator();
+                });
+            }
+
+            //DEBUG loadItems();
+
+            $('#item-list').on('click', '#btn-edit', function () {
+
+                var cmd = $(this);
+
+                $.get(`/api/item/${cmd.data('id')}`).done(function (item) {
+                    showForm();
+                    $('#Item_Id').val(item.id);
+                    $('#Item_Name').val(item.name);
+                    $('#Item_Username').val(item.username);
+                    $('#Item_Password').val(item.password);
+                    $('#Item_Uri').val(item.uri);
+                });
+            });
+
+        });
+    </script>
+}

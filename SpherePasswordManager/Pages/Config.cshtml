@@ -1,0 +1,51 @@
+﻿@page
+@model SpherePasswordManager.Pages.ConfigModel
+@{
+    ViewData["Title"] = "Config";
+}
+
+<h1>Configuration</h1>
+
+<div asp-validation-summary="All"></div>
+<form method="post" class="col-sm-12">
+
+    <div asp-validation-summary="All" class="offset-sm-1"></div>
+
+
+    <div class="input-group mb-3">
+        <div class="input-group-prepend">
+            <label class="input-group-text" asp-for="ConfigData.IotHubService"></label>
+        </div>
+        <textarea class="form-control" asp-for="ConfigData.IotHubService"
+                  value="@Model.ConfigData.IotHubService"></textarea>
+    </div>
+
+    <div class="input-group mb-3">
+        <div class="input-group-prepend">
+            <label class="input-group-text" asp-for="ConfigData.AzureSphereDevice"></label>
+        </div>
+        <input type="text" class="form-control" asp-for="ConfigData.AzureSphereDevice"
+               value="@Model.ConfigData.AzureSphereDevice" />
+    </div>
+
+    <div class="col-sm-1 offset-sm-1">
+        <button class="btn btn-primary" id="submit">Submit</button>
+    </div>
+</form>
+
+@section scripts{
+    @await Html.PartialAsync("_ValidationScriptsPartial")
+
+    <script type="text/javascript">
+    $(function () {
+
+        var showLoadingIndicator = function () {
+            $('.loading').show();
+        }
+
+        var hideLoadingIndicator = function () {
+            $('.loading').hide();
+        }
+    });
+    </script>
+}
