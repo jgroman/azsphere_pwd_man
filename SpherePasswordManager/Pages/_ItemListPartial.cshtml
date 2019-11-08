@@ -1,0 +1,15 @@
+﻿@using SpherePasswordManager.Models
+@model List<Item>
+
+<ul id="item-list" class="list-group list-group-flush">
+    @foreach (var item in Model)
+    {
+    <li class="list-group-item">
+        <a href="" data-ajax="true" data-ajax-url="/api/iot/send/@item.Id" data-ajax-method="post" data-ajax-update="#panel">
+            <span class="entry" id="@item.Id">@item.Name</span>
+        </a>
+        <a asp-page="Edit" asp-route-id="@item.Id" class="btn btn-outline-secondary">Edit</a>
+        <div id="panel"></div>
+    </li>
+    }
+</ul>

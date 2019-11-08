@@ -121,16 +121,12 @@ namespace SpherePasswordManager.Services
         public async Task<bool> CheckItemNameExistsAsync(string itemName)
         {
             var items = await ReadAllAsync();
-            //System.Diagnostics.Debug.WriteLine($"***** check name '{itemName}'");
-            try
+            var item = items.SingleOrDefault(c => c.Name == itemName);
+            if (item == null)
             {
-                var item = items.Single(c => c.Name == itemName);
-            }
-            catch (InvalidOperationException)
-            {
-                // Item name doesn't exist
                 return false;
             }
+
             return true;
         }
 
@@ -173,16 +169,16 @@ namespace SpherePasswordManager.Services
 
         public async Task DeleteAsync(int id)
         {
-            // Get cached list of all items
+            // Get list of all items
             var items = await ReadAllAsync();
 
             // Get item to delete
             var deletedItem = items.Single(c => c.Id == id);
 
-            // Remove item from cached list
+            // Remove item from list
             items.Remove(deletedItem);
 
-            // Update cached list, no reorder necessary
+            // Update liad cache, no reorder necessary
             _cache.Set("ItemList", items);
 
             // Remove item from KeyVault

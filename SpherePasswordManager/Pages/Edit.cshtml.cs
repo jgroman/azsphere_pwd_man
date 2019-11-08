@@ -22,28 +22,69 @@ namespace SpherePasswordManager.Pages
             _itemService = itemService;
         }
 
-        /*
-        public IActionResult OnGet() {
-            return Page();
-        }
-        */
-
         public async Task<IActionResult> OnGetAsync(int id)
         {
-            /*
             if (id == 0)
             {
-                Item = new Item();
-                return Page();
+                Item = new Item() { 
+                    Id = 0
+                };
+            }
+            else
+            {
+                Item = await _itemService.ReadAsync(id);
+                if (Item == null)
+                {
+                    return RedirectToPage("/Index");
+                }
+
             }
 
-            Item = await _itemService.ReadAsync(id);
-            if (Item == null)
-            {
-                return RedirectToPage("/Index");
-            }
-            */
             return Page();
+        }
+
+        public async Task<IActionResult> OnGetEditAsync(int id)
+        {
+            if (id == 0)
+            {
+                Item = new Item()
+                {
+                    Id = 0
+                };
+            }
+            else
+            {
+                Item = await _itemService.ReadAsync(id);
+                if (Item == null)
+                {
+                    return RedirectToPage("/Index");
+                }
+
+            }
+
+            return Page();
+        }
+
+        public async Task<IActionResult> OnGetDeleteAsync(int id)
+        {
+            await _itemService.DeleteAsync(id);
+            return RedirectToPage("/Index");
+        }
+
+        public async Task<IActionResult> OnPostSubmitAsync(int id)
+        {
+            if (Item.Id == 0)
+            {
+                // Create new item
+                await _itemService.CreateAsync(Item);
+            }
+            else
+            {
+                // Update existing item
+                await _itemService.UpdateAsync(Item);
+            }
+
+            return RedirectToPage("/Index");
         }
 
     }
