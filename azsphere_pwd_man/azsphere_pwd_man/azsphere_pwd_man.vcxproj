@@ -52,13 +52,13 @@
     <UpToDateCheckInput Include="app_manifest.json" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="build_options.h" />
+    <ClInclude Include="connection_strings.h" />
+  </ItemGroup>
+  <ItemGroup>
     <ProjectReference Include="..\lib_u8g2\lib_u8g2\lib_u8g2.vcxproj">
       <Project>{10f4b2dd-b608-4b0b-bf95-08214f5695a4}</Project>
     </ProjectReference>
-  </ItemGroup>
-  <ItemGroup>
-    <ClInclude Include="build_options.h" />
-    <ClInclude Include="connection_strings.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets" />
