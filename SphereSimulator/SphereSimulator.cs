@@ -53,7 +53,7 @@ namespace sphere_simulator
             var data = Encoding.UTF8.GetString(methodRequest.Data);
             Console.WriteLine("{0} > Received message: {1}", DateTime.Now, data);
 
-            string result = "{\"result\":\"OK\"}";
+            string result = "{\"result\":\"Item loaded.\"}";
             return Task.FromResult(new MethodResponse(Encoding.UTF8.GetBytes(result), 200));
         }
 

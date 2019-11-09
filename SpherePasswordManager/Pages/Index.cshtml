@@ -4,36 +4,40 @@
     ViewData["Title"] = "Home page";
 }
 
-<div class="row" id="content">
-    <div id="items" class="col-lg-6"></div>
+<h2 class="mb-5">All Items</h2>
+
+<div class="col-lg-6" id="content">
+    <div id="items"></div>
 </div>
+
 
 @section scripts{
     <script src="~/lib/jquery-ajax-unobtrusive/jquery.unobtrusive-ajax.min.js"></script>
     <script type="text/javascript">
         $(function () {
 
+            // Show loading indicator
+            $('.loading').show();
+
             // Load item list
-            $('#items').load('/index/ItemsLoader');
-
-            // On item entry click
-                /*
-            $('#item-list').on('click', '.entry', function (e) {
-                e.preventDefault();
-                var id = $(this).attr('id');
-                alert("CLICK " + id);
-
-                $.ajax({
-                    type: 'post',
-                    url: '/api/iot/send/' + id,
-                    data: "",
-                    contentType: 'application/json'
-                }).done(function () {
-                    alert("sent");
-                });
-
+            $("#items").load("/index/ItemsLoader", function () {
+                // Hide loading indicator
+                $('.loading').hide();
             });
-                */
+
+            iot_post_completed = function (xhr) {
+                var responseText = xhr.responseText;
+
+                $("#iot-status-badge").text(responseText);
+
+                if (responseText.search("ERROR") != -1) {
+                    $("#iot-status-badge").attr("class", "ml-3 badge badge-danger");
+                }
+                else {
+                    $("#iot-status-badge").attr("class", "ml-3 badge badge-success");
+                }
+
+            };
 
         });
     </script>

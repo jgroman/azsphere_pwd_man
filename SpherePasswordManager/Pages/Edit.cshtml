@@ -4,48 +4,55 @@
     ViewData["Title"] = "Item";
 }
 
-<div class="col-lg-6">
-    <div id="form" style="max-width: 280px;">
-        <form class="form-horizontal" method="post">
-            <input type="hidden" asp-for="Item.Id" />
+@if (@Model.Item.Id != 0)
+{
+    <h2 class="mb-5">Edit Item</h2>
+}
+else
+{
+    <h2 class="mb-5">Add Item</h2>
+}
 
-            <div class="form-group">
-                <label asp-for="Item.Name"></label>
-                <input type="text" asp-for="Item.Name" class="form-control input-sm" />
-                <small class="form-text text-muted"><span asp-validation-for="Item.Name"></span></small>
-            </div>
+<div class="col-lg-6" id="form">
+    <form class="form-horizontal w-75" method="post">
+        <input type="hidden" asp-for="Item.Id" />
 
-            <div class="form-group">
-                <label for="Username">Username</label>
-                <input type="text" asp-for="Item.Username" class="form-control input-sm" />
-                <small class="form-text text-muted"><span asp-validation-for="Item.Username"></span></small>
-            </div>
+        <div class="form-group">
+            <label class="font-weight-bold" asp-for="Item.Name"></label>
+            <input type="text" asp-for="Item.Name" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Item.Name"></span></small>
+        </div>
 
-            <div class="form-group">
-                <label for="Password">Password</label>
-                <input type="text" asp-for="Item.Password" class="form-control input-sm" />
-                <small class="form-text text-muted"><span asp-validation-for="Item.Password"></span></small>
-            </div>
+        <div class="form-group">
+            <label class="font-weight-bold" asp-for="Item.Username"></label>
+            <input type="text" asp-for="Item.Username" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Item.Username"></span></small>
+        </div>
 
-            <div class="form-group">
-                <label for="Url">Url</label>
-                <input type="text" asp-for="Item.Uri" class="form-control input-sm" />
-                <small class="form-text text-muted"><span asp-validation-for="Item.Uri"></span></small>
-            </div>
+        <div class="form-group">
+            <label class="font-weight-bold" asp-for="Item.Password"></label>
+            <input type="text" asp-for="Item.Password" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Item.Password"></span></small>
+        </div>
 
-            <div class="form-group">
-                @{ var submit_btn_text = "Update"; }
-                @if (@Model.Item.Id != 0)
-                {
-                    <a asp-page-handler="Delete" asp-route-id="@Model.Item.Id" class="btn btn-danger float-left">Delete</a>
-                    submit_btn_text = "Submit";
-                }
+        <div class="form-group">
+            <label class="font-weight-bold" asp-for="Item.Uri"></label>
+            <input type="text" asp-for="Item.Uri" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Item.Uri"></span></small>
+        </div>
 
-                <button asp-page-handler="Submit" asp-route-id="@Model.Item.Id" class="btn btn-primary float-right">@submit_btn_text</button>
-                <a asp-page="./Index" class="btn btn-outline-secondary float-right mr-1">Cancel</a>
-            </div>
-        </form>
-    </div>
+        <div class="form-group">
+            @{ var submit_btn_text = "Submit"; }
+            @if (@Model.Item.Id != 0)
+            {
+                <a asp-page-handler="Delete" asp-route-id="@Model.Item.Id" class="btn btn-danger float-left">Delete</a>
+                submit_btn_text = "Update";
+            }
+
+            <button asp-page-handler="Submit" asp-route-id="@Model.Item.Id" class="btn btn-primary float-right">@submit_btn_text</button>
+            <a asp-page="./Index" class="btn btn-outline-secondary float-right mr-3">Cancel</a>
+        </div>
+    </form>
 </div>
 
 @section scripts{

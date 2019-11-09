@@ -4,34 +4,32 @@
     ViewData["Title"] = "Config";
 }
 
-<h1>Configuration</h1>
+<h2 class="mb-5">Configuration</h2>
 
-<div asp-validation-summary="All"></div>
-<form method="post" class="col-sm-12">
+<div class="col-lg-6">
+    <form method="post" class="w-75">
 
-    <div asp-validation-summary="All" class="offset-sm-1"></div>
-
-
-    <div class="input-group mb-3">
-        <div class="input-group-prepend">
-            <label class="input-group-text" asp-for="ConfigData.IotHubService"></label>
+        <div class="form-group mb-3">
+            <label class="font-weight-bold" asp-for="ConfigData.AzureSphereDevice"></label>
+            <small class="form-text text-danger"><span asp-validation-for="ConfigData.AzureSphereDevice"></span></small>
+            <input type="text" class="form-control" asp-for="ConfigData.AzureSphereDevice"
+                   value="@Model.ConfigData.AzureSphereDevice" aria-describedby="sphereName" placeholder="Enter Azure Sphere Device Name" />
         </div>
-        <textarea class="form-control" asp-for="ConfigData.IotHubService"
-                  value="@Model.ConfigData.IotHubService"></textarea>
-    </div>
 
-    <div class="input-group mb-3">
-        <div class="input-group-prepend">
-            <label class="input-group-text" asp-for="ConfigData.AzureSphereDevice"></label>
+        <div class="form-group mt-3">
+            <label class="font-weight-bold" asp-for="ConfigData.IotHubService"></label>
+            <small class="form-text text-danger"><span asp-validation-for="ConfigData.IotHubService"></span></small>
+            <textarea class="form-control" asp-for="ConfigData.IotHubService" rows="5"
+                      value="@Model.ConfigData.IotHubService"> placeholder="Enter IoT Hub SERVICE Connection String"</textarea>
         </div>
-        <input type="text" class="form-control" asp-for="ConfigData.AzureSphereDevice"
-               value="@Model.ConfigData.AzureSphereDevice" />
-    </div>
 
-    <div class="col-sm-1 offset-sm-1">
-        <button class="btn btn-primary" id="submit">Submit</button>
-    </div>
-</form>
+        <div class="form-group">
+            <button class="btn btn-primary float-right" id="submit">Submit</button>
+            <a asp-page="./Index" class="btn btn-outline-secondary float-right mr-3">Cancel</a>
+
+        </div>
+    </form>
+</div>
 
 @section scripts{
     @await Html.PartialAsync("_ValidationScriptsPartial")

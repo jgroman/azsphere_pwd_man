@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 using Microsoft.Azure.Devices;
@@ -14,8 +15,6 @@ using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Configuration;
 
 using Microsoft.Rest;
-
-using Newtonsoft.Json;
 
 using SpherePasswordManager.Models;
 
@@ -149,7 +148,7 @@ namespace SpherePasswordManager.Services
             items.Add(newItem);
 
             // Store item in KeyVault
-            string itemJson = JsonConvert.SerializeObject(newItem);
+            string itemJson = JsonSerializer.Serialize(newItem);
 
             try
             {
@@ -218,13 +217,13 @@ namespace SpherePasswordManager.Services
                 // Get item from JSON
                 try
                 {
-                    var fullItem = JsonConvert.DeserializeObject<Item>(itemJson);
+                    var fullItem = JsonSerializer.Deserialize<Item>(itemJson);
 
                     // Update item in cached list, no name change
                     fullItem.Id = currentItem.Id;
                     await UpdateAsync(fullItem);
                 }
-                catch (JsonReaderException)
+                catch (JsonException)
                 {
                 }
 
@@ -269,7 +268,7 @@ namespace SpherePasswordManager.Services
                 _cache.Set("ItemList", items);
 
                 // Update item in KeyVault
-                string itemJson = JsonConvert.SerializeObject(item);
+                string itemJson = JsonSerializer.Serialize(item);
                 await keyVaultClient.SetSecretAsync(
                     KeyVaultBaseUrl, item.Name, itemJson);
             }
@@ -296,9 +295,13 @@ namespace SpherePasswordManager.Services
                 if (fex.Message.Equals("Malformed Token"))
                 {
                     // Invalid Iot Hub Service Connection String
-                    return JsonConvert.SerializeObject("Invalid Iot Hub Service Connection String");
+                    return ("ERROR: Invalid Iot Hub Service Connection String");
                 }
-                return JsonConvert.SerializeObject("Message Format Exception");
+                return ("ERROR: Iot Hub Message Format Exception");
+            }
+            catch (ArgumentException)
+            {
+                return ("ERROR: Invalid Iot Hub Service Connection String");
             }
 
             string methodName = _config.GetValue<string>("AzureSphereDevice:directMethodName");
@@ -309,13 +312,14 @@ namespace SpherePasswordManager.Services
                 ResponseTimeout = TimeSpan.FromSeconds(methodTimeout)
             };
 
-            methodInvocation.SetPayloadJson(JsonConvert.SerializeObject(item));
+            methodInvocation.SetPayloadJson(JsonSerializer.Serialize(item));
 
             // Invoke the direct method asynchronously and get the response from IoT device.
+            CloudToDeviceMethodResult deviceResult;
             try
             {
-                var response = await serviceClient.InvokeDeviceMethodAsync(configData.AzureSphereDevice, methodInvocation);
-                System.Diagnostics.Debug.WriteLine($"***** Response payload '{response.GetPayloadAsJson()}'");
+                deviceResult = await serviceClient.InvokeDeviceMethodAsync(configData.AzureSphereDevice, methodInvocation);
+                System.Diagnostics.Debug.WriteLine($"***** Response payload '{deviceResult.GetPayloadAsJson()}'");
             }
             catch (DeviceNotFoundException dnfex)
             {
@@ -324,21 +328,30 @@ namespace SpherePasswordManager.Services
                 if (dnfex.Message.Contains(":404001,"))
                 {
                     // errorCode 404001: Device not registered or incorrect name
-                    return JsonConvert.SerializeObject("Device not registered");
+                    return ("ERROR: Device not registered in IoT Hub");
                 }
                 else if (dnfex.Message.Contains(":404103,"))
                 {
                     // errorCode 404103: Timeout
-                    return JsonConvert.SerializeObject("Timeout connecting to device");
+                    return ("ERROR: Timeout connecting device");
                 }
 
-                return JsonConvert.SerializeObject("Device not found");
+                return ("ERROR: Device not found");
             }
 
-            // TODO process response
-            // result = response.GetPayloadAsJson();
+            // Azure Sphere currently returns just result property
+            string result;
+            try
+            {
+                JsonDocument document = JsonDocument.Parse(deviceResult.GetPayloadAsJson());
+                result = document.RootElement.GetProperty("result").GetString();
+            }
+            catch (JsonException)
+            {
+                result = "ERROR: Response parsing failed";
+            }
 
-            return JsonConvert.SerializeObject("true");
+            return result;
         }
 
     }

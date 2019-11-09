@@ -6,8 +6,11 @@
     <title>@ViewData["Title"] - SpherePasswordManager</title>
     <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
     <link rel="stylesheet" href="~/css/site.css" />
+    <link rel="stylesheet" href="~/css/fontawesome.min.css" />
+    <link rel="stylesheet" href="~/css/solid.min.css" />
 </head>
 <body>
+    <partial name="_LoadingPartial" />
     <header>
         <nav class="navbar navbar-expand-sm navbar-toggleable-sm navbar-light bg-white border-bottom box-shadow mb-3">
             <div class="container">
@@ -40,7 +43,9 @@
 
     <footer class="border-top footer text-muted">
         <div class="container">
-            &copy; 2019 - SpherePasswordManager - <a asp-area="" asp-page="/Privacy">Privacy</a>
+            &copy; 2019 - SpherePasswordManager
+            <span class="ml-3" id="iot-status" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>
+            <span class="ml-3 badge" id="iot-status-badge"></span>
         </div>
     </footer>
 

@@ -8,8 +8,6 @@ using Microsoft.AspNetCore.Mvc;
 using SpherePasswordManager.Models;
 using SpherePasswordManager.Services;
 
-using Newtonsoft.Json;
-
 namespace SpherePasswordManager.Controllers
 {
     [Route("api/[controller]")]
