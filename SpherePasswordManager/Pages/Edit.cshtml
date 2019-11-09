@@ -1,10 +1,10 @@
-﻿@page "{id?}/{handler?}"
+﻿@page "{handler?}/{id?}"
 @model SpherePasswordManager.Pages.EditModel
 @{
     ViewData["Title"] = "Item";
 }
 
-@if (@Model.Item.Id != 0)
+@if (@Model.Id != 0)
 {
     <h2 class="mb-5">Edit Item</h2>
 }
@@ -14,42 +14,42 @@ else
 }
 
 <div class="col-lg-6" id="form">
-    <form class="form-horizontal w-75" method="post">
-        <input type="hidden" asp-for="Item.Id" />
+    <form asp-page-handler="submit" class="form-horizontal w-75" method="post">
+        <input type="hidden" asp-for="Id" />
 
         <div class="form-group">
-            <label class="font-weight-bold" asp-for="Item.Name"></label>
-            <input type="text" asp-for="Item.Name" class="form-control" />
-            <small class="form-text text-danger"><span asp-validation-for="Item.Name"></span></small>
+            <label class="font-weight-bold" asp-for="Name"></label>
+            <input type="text" asp-for="Name" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Name"></span></small>
         </div>
 
         <div class="form-group">
-            <label class="font-weight-bold" asp-for="Item.Username"></label>
-            <input type="text" asp-for="Item.Username" class="form-control" />
-            <small class="form-text text-danger"><span asp-validation-for="Item.Username"></span></small>
+            <label class="font-weight-bold" asp-for="Username"></label>
+            <input type="text" asp-for="Username" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Username"></span></small>
         </div>
 
         <div class="form-group">
-            <label class="font-weight-bold" asp-for="Item.Password"></label>
-            <input type="text" asp-for="Item.Password" class="form-control" />
-            <small class="form-text text-danger"><span asp-validation-for="Item.Password"></span></small>
+            <label class="font-weight-bold" asp-for="Password"></label>
+            <input type="text" asp-for="Password" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Password"></span></small>
         </div>
 
         <div class="form-group">
-            <label class="font-weight-bold" asp-for="Item.Uri"></label>
-            <input type="text" asp-for="Item.Uri" class="form-control" />
-            <small class="form-text text-danger"><span asp-validation-for="Item.Uri"></span></small>
+            <label class="font-weight-bold" asp-for="Uri"></label>
+            <input type="text" asp-for="Uri" class="form-control" />
+            <small class="form-text text-danger"><span asp-validation-for="Uri"></span></small>
         </div>
 
         <div class="form-group">
             @{ var submit_btn_text = "Submit"; }
-            @if (@Model.Item.Id != 0)
+            @if (@Model.Id != 0)
             {
-                <a asp-page-handler="Delete" asp-route-id="@Model.Item.Id" class="btn btn-danger float-left">Delete</a>
+                <a asp-page-handler="Delete" asp-route-id="@Model.Id" class="btn btn-danger float-left">Delete</a>
                 submit_btn_text = "Update";
             }
 
-            <button asp-page-handler="Submit" asp-route-id="@Model.Item.Id" class="btn btn-primary float-right">@submit_btn_text</button>
+            <button class="btn btn-primary float-right">@submit_btn_text</button>
             <a asp-page="./Index" class="btn btn-outline-secondary float-right mr-3">Cancel</a>
         </div>
     </form>

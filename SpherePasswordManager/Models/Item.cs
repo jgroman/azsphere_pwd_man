@@ -14,7 +14,13 @@ namespace SpherePasswordManager.Models
         [Required]
         [StringLength(30, ErrorMessage = "Name cannot be longer than 30 characters.")]
         [RegularExpression(@".*[a-zA-Z0-9\-]$", ErrorMessage = "Alphanumeric characters and dashes only.")]
-        [Remote(action: "ValidateItemName", controller: "Validator", ErrorMessage = "Name already exists.")]
+        [PageRemote(
+            PageName ="Edit",
+            PageHandler = "ValidateName",
+            AdditionalFields = nameof(Id) + ", __RequestVerificationToken",
+            HttpMethod = "post",
+            ErrorMessage = "Name already exists."
+        )]
         public string Name { get; set; }
 
         [Required]

@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
@@ -10,10 +11,32 @@ using SpherePasswordManager.Services;
 
 namespace SpherePasswordManager.Pages
 {
+    [BindProperties]
     public class EditModel : PageModel
     {
-        [BindProperty]
-        public Item Item { get; set; }
+        public int Id { get; set; }
+
+        [Required]
+        [StringLength(30, ErrorMessage = "Name cannot be longer than 30 characters.")]
+        [RegularExpression(@".*[a-zA-Z0-9\-]$", ErrorMessage = "Alphanumeric characters and dashes only.")]
+        [PageRemote(
+            PageHandler = "ValidateName",
+            AdditionalFields = nameof(Id) + ", __RequestVerificationToken",
+            HttpMethod = "post",
+            ErrorMessage = "Name already exists."
+        )]
+        public string Name { get; set; }
+
+        [Required]
+        [StringLength(50, ErrorMessage = "Password cannot be longer than 50 characters.")]
+        public string Password { get; set; }
+
+        [StringLength(50, ErrorMessage = "Username cannot be longer than 50 characters.")]
+        public string Username { get; set; }
+
+        [StringLength(100, ErrorMessage = "URL cannot be longer than 100 characters.")]
+        public string Uri { get; set; }
+
 
         private readonly IItemService _itemService;
 
@@ -22,45 +45,36 @@ namespace SpherePasswordManager.Pages
             _itemService = itemService;
         }
 
-        public async Task<IActionResult> OnGetAsync(int id)
+        public IActionResult OnGetCreate()
         {
-            if (id == 0)
-            {
-                Item = new Item() { 
-                    Id = 0
-                };
-            }
-            else
-            {
-                Item = await _itemService.ReadAsync(id);
-                if (Item == null)
-                {
-                    return RedirectToPage("/Index");
-                }
-
-            }
+            Id = 0;
+            Name = "";
+            Username = "";
+            Password = "";
+            Uri = "";
 
             return Page();
         }
 
-        public async Task<IActionResult> OnGetEditAsync(int id)
+        public async Task<IActionResult> OnGetUpdate(int id)
         {
             if (id == 0)
             {
-                Item = new Item()
-                {
-                    Id = 0
-                };
+                return RedirectToPage("/Index");
             }
-            else
+            
+            Item item = await _itemService.ReadAsync(id);
+            if (item == null)
             {
-                Item = await _itemService.ReadAsync(id);
-                if (Item == null)
-                {
-                    return RedirectToPage("/Index");
-                }
-
+                return RedirectToPage("/Index");
             }
+
+
+            Id = id;
+            Name = item.Name;
+            Username = item.Username;
+            Password = item.Password;
+            Uri = item.Uri;
 
             return Page();
         }
@@ -71,19 +85,56 @@ namespace SpherePasswordManager.Pages
             return RedirectToPage("/Index");
         }
 
-        public async Task<IActionResult> OnPostSubmitAsync(int id)
+        public async Task<IActionResult> OnPostValidateNameAsync(int Id, string Name)
         {
-            if (Item.Id == 0)
+            System.Diagnostics.Debug.WriteLine($"******* Checking {Name}, {Id}");
+
+            if (Id != 0)
+            {
+                // Updating existing item, no name checks if not modified
+                Item originalItem = await _itemService.ReadAsync(Id);
+                if (Name == originalItem.Name)
+                {
+                    return new JsonResult(true);
+                }
+            }
+
+            // Name changed or creating new item
+            bool doesNameExist = await _itemService.CheckItemNameExistsAsync(Name);
+            return new JsonResult(!doesNameExist);
+        }
+
+
+        public async Task<IActionResult> OnPostSubmitAsync()
+        {
+            System.Diagnostics.Debug.WriteLine($"******* Submit {Name}, {Id}");
+
+            Item item = new Item()
+            {
+                Id = Id,
+                Name = Name,
+                Username = Username,
+                Password = Password,
+                Uri = Uri
+            };
+
+            if (Id == 0)
             {
                 // Create new item
-                await _itemService.CreateAsync(Item);
+                await _itemService.CreateAsync(item);
             }
             else
             {
                 // Update existing item
-                await _itemService.UpdateAsync(Item);
+                await _itemService.UpdateAsync(item);
             }
 
+            return RedirectToPage("Index");
+        }
+
+        public async Task<IActionResult> OnPostDeleteAsync(int id)
+        {
+            await _itemService.DeleteAsync(id);
             return RedirectToPage("/Index");
         }
 

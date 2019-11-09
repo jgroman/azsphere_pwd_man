@@ -39,7 +39,7 @@ namespace SpherePasswordManager.Services
         private readonly IMemoryCache _cache;
         private readonly IConfigDataService _configDataService;
 
-        private static AzureServiceTokenProvider azureServiceTokenProvider =
+        private readonly static AzureServiceTokenProvider azureServiceTokenProvider =
             new AzureServiceTokenProvider();
 
         private readonly static KeyVaultClient keyVaultClient =
@@ -319,11 +319,13 @@ namespace SpherePasswordManager.Services
             try
             {
                 deviceResult = await serviceClient.InvokeDeviceMethodAsync(configData.AzureSphereDevice, methodInvocation);
-                System.Diagnostics.Debug.WriteLine($"***** Response payload '{deviceResult.GetPayloadAsJson()}'");
+                //System.Diagnostics.Debug.WriteLine($"***** Response payload '{deviceResult.GetPayloadAsJson()}'");
             }
             catch (DeviceNotFoundException dnfex)
             {
                 //System.Diagnostics.Debug.WriteLine($"***** EX: '{dnfex}'");
+
+                serviceClient.Dispose();
 
                 if (dnfex.Message.Contains(":404001,"))
                 {
@@ -338,6 +340,8 @@ namespace SpherePasswordManager.Services
 
                 return ("ERROR: Device not found");
             }
+
+            serviceClient.Dispose();
 
             // Azure Sphere currently returns just result property
             string result;
