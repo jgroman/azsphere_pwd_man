@@ -34,7 +34,6 @@ namespace SpherePasswordManager.Services
 
     public class ItemService : IItemService
     {
-
         private readonly IConfiguration _config;
         private readonly IMemoryCache _cache;
         private readonly IConfigDataService _configDataService;
@@ -51,7 +50,6 @@ namespace SpherePasswordManager.Services
 
         private readonly static int MaxGetSecretsResults = 25;
 
-
         public ItemService(IConfiguration config, IMemoryCache cache, IConfigDataService configDataService)
         {
             _config = config;
@@ -66,7 +64,6 @@ namespace SpherePasswordManager.Services
 
         public async Task<List<Item>> ReadAllAsync()
         {
-
             if (_cache.Get("ItemList") == null)
             {
 
@@ -125,13 +122,11 @@ namespace SpherePasswordManager.Services
             {
                 return false;
             }
-
             return true;
         }
 
         public async Task CreateAsync(Item newItem)
         {
-
             // Ignore items with no name
             if (string.IsNullOrEmpty(newItem.Name))
             {
@@ -187,7 +182,6 @@ namespace SpherePasswordManager.Services
 
         public async Task<Item> ReadAsync(int id)
         {
-
             // Get cached list of all items
             List<Item> items = await ReadAllAsync();
 
@@ -197,7 +191,6 @@ namespace SpherePasswordManager.Services
 
             if (string.IsNullOrEmpty(currentItem.Password))
             {
-
                 string itemJson;
 
                 // Load full item content JSON from KeyVault
@@ -357,7 +350,5 @@ namespace SpherePasswordManager.Services
 
             return result;
         }
-
     }
-
 }

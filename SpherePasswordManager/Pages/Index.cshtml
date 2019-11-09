@@ -32,8 +32,6 @@
             iot_post_completed = function (xhr) {
                 var responseText = xhr.responseText;
 
-                //$(".iot-status-badge").text("");
-
                 if (responseText.search("ERROR") != -1) {
                     $(".iot-status-badge").attr("class", "iot-status-badge ml-3 badge badge-danger");
                 }

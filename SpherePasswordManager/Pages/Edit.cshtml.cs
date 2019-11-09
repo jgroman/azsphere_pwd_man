@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Threading.Tasks;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
@@ -87,11 +84,9 @@ namespace SpherePasswordManager.Pages
 
         public async Task<IActionResult> OnPostValidateNameAsync(int Id, string Name)
         {
-            System.Diagnostics.Debug.WriteLine($"******* Checking {Name}, {Id}");
-
             if (Id != 0)
             {
-                // Updating existing item, no name checks if not modified
+                // Updating existing item, no name checks if name not modified
                 Item originalItem = await _itemService.ReadAsync(Id);
                 if (Name == originalItem.Name)
                 {
@@ -137,6 +132,5 @@ namespace SpherePasswordManager.Pages
             await _itemService.DeleteAsync(id);
             return RedirectToPage("/Index");
         }
-
     }
 }
