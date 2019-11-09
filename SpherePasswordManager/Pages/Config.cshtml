@@ -4,10 +4,8 @@
     ViewData["Title"] = "Config";
 }
 
-<h2 class="mb-5">Configuration</h2>
-
 <div class="col-lg-6">
-    <form method="post" class="w-75">
+    <form method="post">
 
         <div class="form-group mb-3">
             <label class="font-weight-bold" asp-for="ConfigData.AzureSphereDevice"></label>
@@ -19,7 +17,7 @@
         <div class="form-group mt-3">
             <label class="font-weight-bold" asp-for="ConfigData.IotHubService"></label>
             <small class="form-text text-danger"><span asp-validation-for="ConfigData.IotHubService"></span></small>
-            <textarea class="form-control" asp-for="ConfigData.IotHubService" rows="5"
+            <textarea class="form-control" asp-for="ConfigData.IotHubService" rows="4"
                       value="@Model.ConfigData.IotHubService"> placeholder="Enter IoT Hub SERVICE Connection String"</textarea>
         </div>
 

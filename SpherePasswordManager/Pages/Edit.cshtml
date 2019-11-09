@@ -4,17 +4,8 @@
     ViewData["Title"] = "Item";
 }
 
-@if (@Model.Id != 0)
-{
-    <h2 class="mb-5">Edit Item</h2>
-}
-else
-{
-    <h2 class="mb-5">Add Item</h2>
-}
-
 <div class="col-lg-6" id="form">
-    <form asp-page-handler="submit" class="form-horizontal w-75" method="post">
+    <form asp-page-handler="submit" method="post">
         <input type="hidden" asp-for="Id" />
 
         <div class="form-group">

@@ -20,7 +20,7 @@ namespace SpherePasswordManager.Pages
         [StringLength(30, ErrorMessage = "Name cannot be longer than 30 characters.")]
         [RegularExpression(@".*[a-zA-Z0-9\-]$", ErrorMessage = "Alphanumeric characters and dashes only.")]
         [PageRemote(
-            PageHandler = "ValidateName",
+            PageHandler = "validatename",
             AdditionalFields = nameof(Id) + ", __RequestVerificationToken",
             HttpMethod = "post",
             ErrorMessage = "Name already exists."

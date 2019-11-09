@@ -4,20 +4,25 @@
 <ul id="item-list" class="list-group list-group-flush">
     @foreach (var item in Model)
     {
-    <li class="list-group-item">
+    <li class="list-group-item pb-1">
 
         <div class="d-flex">
                 <a href=""
-                   class="p-2 flex-grow-1 text-dark text-decoration-none"
+                   class="flex-grow-1 text-dark text-decoration-none p-1 pb-0 iot-link"
                    data-ajax="true"
                    data-ajax-url="/api/iot/send/@item.Id"
                    data-ajax-method="post"
+                   data-ajax-update="#iot-status-badge-@item.Id"
                    data-ajax-complete="iot_post_completed"
-                   data-ajax-loading="#iot-status">
-                    <span class="entry h3 text-dark" id="@item.Id">@item.Name</span>
+                   data-ajax-loading="#iot-status-@item.Id">
+                    <div class="entry h4 text-dark mb-0" id="@item.Id">@item.Name</div>
+                    <div class="text-center">
+                        <span class="ml-3 iot-status" id="iot-status-@item.Id" style="display:none;"><i class="fas fa-spinner fa-spin"></i></span>
+                        <span class="ml-3 badge iot-status-badge" id="iot-status-badge-@item.Id"></span>
+                    </div>
                 </a>
             <div class="p-2 bd-highlight">
-                <a asp-page="Edit" asp-page-handler="Update" asp-route-id="@item.Id" class="btn btn-outline-secondary">Edit</a>
+                <a asp-page="Edit" asp-page-handler="Update" asp-route-id="@item.Id" class="btn btn-outline-secondary"><i class="fas fa-edit"></i> Edit</a>
             </div>
         </div>
 

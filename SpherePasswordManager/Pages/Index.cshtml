@@ -4,8 +4,6 @@
     ViewData["Title"] = "Home page";
 }
 
-<h2 class="mb-5">All Items</h2>
-
 <div class="col-lg-6" id="content">
     <div id="items"></div>
 </div>
@@ -23,20 +21,25 @@
             $("#items").load("/index/ItemsLoader", function () {
                 // Hide loading indicator
                 $('.loading').hide();
+
+                // Set click listener to list items
+                $(".iot-link").on("click", function () {
+                    // Erase status text from previous clicks
+                    $(".iot-status-badge").text("");
+                });
             });
 
             iot_post_completed = function (xhr) {
                 var responseText = xhr.responseText;
 
-                $("#iot-status-badge").text(responseText);
+                //$(".iot-status-badge").text("");
 
                 if (responseText.search("ERROR") != -1) {
-                    $("#iot-status-badge").attr("class", "ml-3 badge badge-danger");
+                    $(".iot-status-badge").attr("class", "iot-status-badge ml-3 badge badge-danger");
                 }
                 else {
-                    $("#iot-status-badge").attr("class", "ml-3 badge badge-success");
+                    $(".iot-status-badge").attr("class", "iot-status-badge ml-3 badge badge-success");
                 }
-
             };
 
         });
