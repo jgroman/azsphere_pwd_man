@@ -1,6 +1,7 @@
 ﻿/***************************************************************************//**
 * @file    main.c
 * @version 1.0.0
+* @authors Microsoft - Azure Sphere Examples
 * @authors Jaroslav Groman
 *
 * @par Project Name
@@ -68,6 +69,24 @@
 
 #define DIRECT_METHOD_CALL_PAYLOAD_MAX      400
 
+#define JSON_NAME_LENGTH        30
+#define JSON_USERNAME_LENGTH    50
+#define JSON_PASSWORD_LENGTH    50
+#define JSON_URL_LENGTH         100
+
+#define JSON_NAME_NAME          "Name"
+#define JSON_USERNAME_NAME      "Username"
+#define JSON_PASSWORD_NAME      "Password"
+#define JSON_URL_NAME           "Uri"
+
+typedef struct item_data_s
+{
+    unsigned char name[JSON_NAME_LENGTH + 1];
+    unsigned char username[JSON_USERNAME_LENGTH + 1];
+    unsigned char password[JSON_PASSWORD_LENGTH + 1];
+    unsigned char url[JSON_URL_LENGTH + 1];
+} item_data_t;
+
 /*******************************************************************************
 * Forward declarations of private functions
 *******************************************************************************/
@@ -105,7 +124,7 @@ static int
 init_peripherals(void);
 
 /**
- *
+ * @brief Close all opened peripherals.
  */
 static void
 close_peripherals_and_handlers(void);
@@ -117,17 +136,53 @@ static void
 handle_button1_press(void);
 
 /**
+ * @brief Button2 press handler
+ */
+static void
+handle_button2_press(void);
+
+/**
  * @brief Timer event handler for polling button states
  */
 static void
 event_handler_timer_button(EventData *event_data);
 
 static void
-*setup_heap_message(const char *messageFormat, size_t maxLength, ...);
+setup_item_sender();
 
+/**
+ * @brief Allocates and formats a string message on the heap.
+ *
+ * @param p_message_fmt The format of the message.
+ * @param msg_length_max The maximum length of the formatted message string.
+ *
+ * @return The pointer to the heap allocated memory.
+ */
+static void
+*setup_heap_message(const char *p_message_fmt, size_t msg_length_max, ...);
+
+/**
+ * @brief Direct Method callback function, called when a Direct Method call 
+ * is received from the Azure IoT Hub.
+ *
+ * @param p_method_name The name of the method being called.
+ * @param p_payload The payload of the method.
+ * @param payload_size Direct method payload size.
+ * @param pp_response_payload The response payload content. This must be 
+ *    a heap-allocated string, 'free' will be called on this buffer 
+ *    by the Azure IoT Hub SDK.
+ * @param p_response_payload_size The size of the response payload content.
+ *
+ * @return 
+ *    200 HTTP status code if the method name is reconginized and 
+ *        the payload is correctly parsed;
+ *    400 HTTP status code if the payload is invalid;
+ *    404 HTTP status code if the method name is unknown.
+ */
 static int
-cb_direct_method_call(const char *methodName, const char *payload, size_t payloadSize, char **responsePayload, size_t *responsePayloadSize);
-
+cb_direct_method_call(const char* p_method_name,
+    const char* p_payload, size_t payload_size,
+    char** pp_response_payload, size_t* p_response_payload_size);
 
 /*******************************************************************************
 * Global variables
@@ -139,9 +194,11 @@ volatile sig_atomic_t gb_is_termination_requested = false;
 static int g_fd_epoll = -1;        // Epoll file descriptor
 static int g_fd_i2c = -1;          // I2C interface file descriptor
 static int g_fd_gpio_button1 = -1; // GPIO button1 file descriptor
+static int g_fd_gpio_button2 = -1; // GPIO button2 file descriptor
 static int g_fd_poll_timer_button = -1;    // Poll timer button press file desc.
 
 static GPIO_Value_Type g_state_button1 = GPIO_Value_High;
+static GPIO_Value_Type g_state_button2 = GPIO_Value_High;
 
 static EventData g_event_data_button = {          // Button Event data
     .eventHandler = &event_handler_timer_button
@@ -149,6 +206,7 @@ static EventData g_event_data_button = {          // Button Event data
 
 static u8g2_t g_u8g2;           // OLED device descriptor for u8g2
 
+static item_data_t g_item_data;
 
 /*******************************************************************************
 * Function definitions
@@ -186,6 +244,8 @@ main(int argc, char *argv[])
         // All handlers and peripherals are initialized properly at this point
 
         u8g2_ClearDisplay(&g_u8g2);
+
+        setup_item_sender();
 
         // Main program loop
         while (!gb_is_termination_requested)
@@ -234,14 +294,25 @@ init_handlers(void)
 {
     int result = -1;
 
-    // Create signal handler
-    struct sigaction action;
-    memset(&action, 0, sizeof(struct sigaction));
-    action.sa_handler = termination_handler;
-    result = sigaction(SIGTERM, &action, NULL);
+    // Create SIGTERM signal handler
+    struct sigaction term_action;
+    memset(&term_action, 0, sizeof(struct sigaction));
+    term_action.sa_handler = termination_handler;
+    result = sigaction(SIGTERM, &term_action, NULL);
     if (result != 0)
     {
-        Log_Debug("ERROR: %s - sigaction: errno=%d (%s)\n",
+        Log_Debug("ERROR: %s - SIGTERM: errno=%d (%s)\n",
+            __FUNCTION__, errno, strerror(errno));
+    }
+
+    // Create SIGABRT signal handler
+    struct sigaction abort_action;
+    memset(&abort_action, 0, sizeof(struct sigaction));
+    abort_action.sa_handler = termination_handler;
+    result = sigaction(SIGTERM, &abort_action, NULL);
+    if (result != 0)
+    {
+        Log_Debug("ERROR: %s - SIGABRT: errno=%d (%s)\n",
             __FUNCTION__, errno, strerror(errno));
     }
 
@@ -258,7 +329,6 @@ init_handlers(void)
     // Tell the system about the callback function to call when we receive 
     // a Direct Method message from Azure
     AzureIoT_SetDirectMethodCallback(&cb_direct_method_call);
-
 
     return result;
 }
@@ -324,7 +394,20 @@ init_peripherals(void)
         }
     }
 
-    // Create timer for button press check
+    // Initialize development kit button GPIO
+    // -- Open button2 GPIO as input
+    if (result != -1)
+    {
+        g_fd_gpio_button2 = GPIO_OpenAsInput(PROJECT_BUTTON_2);
+        if (g_fd_gpio_button2 < 0)
+        {
+            Log_Debug("ERROR: Could not open button GPIO: %s (%d).\n",
+                strerror(errno), errno);
+            result = -1;
+        }
+    }
+
+    // Create timer for button press check poll
     if (result != -1)
     {
         struct timespec button_press_check_period = { 0, 1000000 };
@@ -353,6 +436,9 @@ close_peripherals_and_handlers(void)
 
     // Close button1 GPIO fd
     CloseFdAndPrintError(g_fd_gpio_button1, "Button1 GPIO");
+
+    // Close button2 GPIO fd
+    CloseFdAndPrintError(g_fd_gpio_button2, "Button2 GPIO");
 }
 
 static void
@@ -363,10 +449,18 @@ handle_button1_press(void)
 }
 
 static void
+handle_button2_press(void)
+{
+    gb_is_termination_requested = true;
+
+}
+
+static void
 event_handler_timer_button(EventData *event_data)
 {
     bool b_is_all_ok = true;
     GPIO_Value_Type state_button1_current;
+    GPIO_Value_Type state_button2_current;
 
     // Consume timer event
     if (ConsumeTimerFdEvent(g_fd_poll_timer_button) != 0)
@@ -396,168 +490,191 @@ event_handler_timer_button(EventData *event_data)
         }
     }
 
+    if (b_is_all_ok)
+    {
+        // Check for a button2 press
+        if (GPIO_GetValue(g_fd_gpio_button2, &state_button2_current) != 0)
+        {
+            Log_Debug("ERROR: Could not read button GPIO: %s (%d).\n",
+                strerror(errno), errno);
+            gb_is_termination_requested = true;
+            b_is_all_ok = false;
+        }
+        else if (state_button2_current != g_state_button2)
+        {
+            if (state_button2_current == GPIO_Value_Low)
+            {
+                handle_button2_press();
+            }
+            g_state_button2 = state_button2_current;
+        }
+    }
+
     return;
 }
 
-/// <summary>
-///     Allocates and formats a string message on the heap.
-/// </summary>
-/// <param name="messageFormat">The format of the message</param>
-/// <param name="maxLength">The maximum length of the formatted message string</param>
-/// <returns>The pointer to the heap allocated memory.</returns>
+static void
+setup_item_sender()
+{
+    u8g2_ClearDisplay(&g_u8g2);
+
+    u8g2_ClearBuffer(&g_u8g2);
+
+    u8g2_SetFont(&g_u8g2, u8g2_font_t0_22b_tr);
+    lib_u8g2_DrawCenteredStr(&g_u8g2, 30, g_item_data.name);
+
+    u8g2_SetFont(&g_u8g2, u8g2_font_tenfatguys_tr);
+    u8g2_DrawStr(&g_u8g2, 0, 50, "B1: Username");
+    u8g2_DrawStr(&g_u8g2, 0, 64, "B2: Password");
+
+    u8g2_SendBuffer(&g_u8g2);
+}
+
 static void 
-*setup_heap_message(const char *messageFormat, size_t maxLength, ...)
+*setup_heap_message(const char *p_message_fmt, size_t msg_length_max, ...)
 {
     va_list args;
-    va_start(args, maxLength);
-    char *message = malloc(maxLength + 1); // +1 for the null terminator
+    va_start(args, msg_length_max);
+    char *message = malloc(msg_length_max + 1); // +1 for the null terminator
     if (message != NULL) 
     {
-        vsnprintf(message, maxLength, messageFormat, args);
+        vsnprintf(message, msg_length_max, p_message_fmt, args);
     }
     va_end(args);
     return message;
 }
 
-/// <summary>
-///     Direct Method callback function, called when a Direct Method call is received from the Azure
-///     IoT Hub.
-/// </summary>
-/// <param name="methodName">The name of the method being called.</param>
-/// <param name="payload">The payload of the method.</param>
-/// <param name="responsePayload">The response payload content. This must be a heap-allocated
-/// string, 'free' will be called on this buffer by the Azure IoT Hub SDK.</param>
-/// <param name="responsePayloadSize">The size of the response payload content.</param>
-/// <returns>200 HTTP status code if the method name is reconginized and the payload is correctly parsed;
-/// 400 HTTP status code if the payload is invalid;</returns>
-/// 404 HTTP status code if the method name is unknown.</returns>
 static int 
-cb_direct_method_call(const char *methodName, const char *payload, 
-    size_t payloadSize, char **responsePayload, size_t *responsePayloadSize)
+cb_direct_method_call(const char *p_method_name, 
+    const char *p_payload, size_t payload_size, 
+    char **pp_response_payload, size_t *p_response_payload_size)
 {
-    Log_Debug("\nDirect Method called %s\n", methodName);
+    Log_Debug("\nDirect Method called %s\n", p_method_name);
 
     int result = 404; // HTTP status code.
 
-    if (payloadSize < DIRECT_METHOD_CALL_PAYLOAD_MAX) 
+    if (payload_size < DIRECT_METHOD_CALL_PAYLOAD_MAX) 
     {
+        // Declare a char buffer on the stack where we'll operate 
+        // on a copy of the payload.
+        char payload_string[payload_size + 1];
 
-        // Declare a char buffer on the stack where we'll operate on a copy of the payload.  
-        char directMethodCallContent[payloadSize + 1];
+        if (payload_string == NULL)
+        {
+            // Not enough memory for local payload buffer
+            Log_Debug("ERROR: Could not allocate buffer for direct method request payload.\n");
+            abort();
+        }
 
-        // Prepare the payload for the response. This is a heap allocated null terminated string.
-        // The Azure IoT Hub SDK is responsible of freeing it.
-        *responsePayload = NULL;  // Reponse payload content.
-        *responsePayloadSize = 0; // Response payload content size.
+        // Prepare the payload for the response. This is a heap allocated null 
+        // terminated string. The Azure IoT Hub SDK is responsible of freeing it.
+        *pp_response_payload = NULL;  // Reponse payload content.
+        *p_response_payload_size = 0; // Response payload content size.
 
-
-        // Look for the haltApplication method name.  This direct method does not require any payload, other than
-        // a valid Json argument such as {}.
-
-        if (strcmp(methodName, "haltApplication") == 0) 
+        if (strcmp(p_method_name, "set_item_data") == 0) 
         {
             // Log that the direct method was called and set the result to reflect success!
-            Log_Debug("haltApplication() Direct Method called\n");
+            Log_Debug("set_tem_data() Direct Method called\n");
             result = 200;
 
-            // Construct the response message.  This response will be displayed in the cloud when calling the direct method
-            static const char resetOkResponse[] =
-                "{ \"success\" : true, \"message\" : \"Halting Application\" }";
-            size_t responseMaxLength = sizeof(resetOkResponse);
-            *responsePayload = setup_heap_message(resetOkResponse, responseMaxLength);
-            if (*responsePayload == NULL) 
+            // Copy the payload into our local buffer then null terminate it.
+            memcpy(payload_string, p_payload, payload_size);
+            payload_string[payload_size] = 0; // Null terminated string.
+
+            JSON_Value *payload_json_value = json_parse_string(payload_string);
+
+            // Verify we have a valid JSON string from the payload
+            if (payload_json_value == NULL) 
+            {
+                goto payloadError;
+            }
+
+            // Verify that the payload_json_value contains a valid JSON object
+            JSON_Object *payload_json_object = json_value_get_object(
+                payload_json_value);
+            if (payload_json_object == NULL) 
+            {
+                goto payloadError;
+            }
+
+            // Get item data from JSON object
+            char* p_value_string;
+
+            strcpy(g_item_data.name, "\0");
+            p_value_string = json_object_get_string(payload_json_object, 
+                JSON_NAME_NAME);
+            if (p_value_string != NULL)
+            {
+                strncpy(g_item_data.name, p_value_string, JSON_NAME_LENGTH + 1);
+                Log_Debug("JSON Name '%s'\n", g_item_data.name);
+            }
+
+            strcpy(g_item_data.username, "\0");
+            p_value_string = json_object_get_string(payload_json_object, 
+                JSON_USERNAME_NAME);
+            if (p_value_string != NULL)
+            {
+                strncpy(g_item_data.username, p_value_string, 
+                    JSON_USERNAME_LENGTH + 1);
+                Log_Debug("JSON Username '%s'\n", g_item_data.username);
+            }
+
+            strcpy(g_item_data.password, "\0");
+            p_value_string = json_object_get_string(payload_json_object, 
+                JSON_PASSWORD_NAME);
+            if (p_value_string != NULL)
+            {
+                strncpy(g_item_data.password, p_value_string, 
+                    JSON_PASSWORD_LENGTH + 1);
+                Log_Debug("JSON Password '%s'\n", g_item_data.password);
+            }
+
+            strcpy(g_item_data.url, "\0");
+            p_value_string = json_object_get_string(payload_json_object, 
+                JSON_URL_NAME);
+            if (p_value_string != NULL)
+            {
+                strncpy(g_item_data.url, p_value_string, JSON_URL_LENGTH + 1);
+                Log_Debug("JSON Url '%s'\n", g_item_data.url);
+            }
+
+            if ((strlen(g_item_data.name) == 0) ||
+                (strlen(g_item_data.password) == 0))
+            {
+                goto payloadError;
+            }
+
+            // Prepare item data to be sent to USB
+            setup_item_sender();
+
+            // Construct the response message.  This will be displayed in the cloud when calling the direct method
+            static const char newPollTimeResponse[] =
+                "{ \"success\" : true, \"message\" : \"'%s' loaded\" }";
+            size_t responseMaxLength = sizeof(newPollTimeResponse) + strlen(g_item_data.name);
+            *pp_response_payload = setup_heap_message(newPollTimeResponse, responseMaxLength, g_item_data.name);
+            if (*pp_response_payload == NULL)
             {
                 Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
                 abort();
             }
-            *responsePayloadSize = strlen(*responsePayload);
+            *p_response_payload_size = strlen(*pp_response_payload);
 
-            // Set the terminitation flag to true.  When in Visual Studio this will simply halt the application.
-            // If this application was running with the device in field-prep mode, the application would halt
-            // and the OS services would resetart the application.
-            gb_is_termination_requested = true;
             return result;
-        }
-
-        // Check to see if the setSensorPollTime direct method was called
-        else if (strcmp(methodName, "setSensorPollTime") == 0) 
-        {
-            // Log that the direct method was called and set the result to reflect success!
-            Log_Debug("setSensorPollTime() Direct Method called\n");
-            result = 200;
-
-            // The payload should contain a JSON object such as: {"pollTime": 20}
-            if (directMethodCallContent == NULL) 
-            {
-                Log_Debug("ERROR: Could not allocate buffer for direct method request payload.\n");
-                abort();
-            }
-
-            // Copy the payload into our local buffer then null terminate it.
-            memcpy(directMethodCallContent, payload, payloadSize);
-            directMethodCallContent[payloadSize] = 0; // Null terminated string.
-
-            JSON_Value *payloadJson = json_parse_string(directMethodCallContent);
-
-            // Verify we have a valid JSON string from the payload
-            if (payloadJson == NULL) 
-            {
-                goto payloadError;
-            }
-
-            // Verify that the payloadJson contains a valid JSON object
-            JSON_Object *pollTimeJson = json_value_get_object(payloadJson);
-            if (pollTimeJson == NULL) 
-            {
-                goto payloadError;
-            }
-
-            // Pull the Key: value pair from the JSON object, we're looking for {"pollTime": <integer>}
-            // Verify that the new timer is < 0
-            int newPollTime = (int)json_object_get_number(pollTimeJson, "pollTime");
-            if (newPollTime < 1) 
-            {
-                goto payloadError;
-            }
-            else 
-            {
-                Log_Debug("New PollTime %d\n", newPollTime);
-
-                // Construct the response message.  This will be displayed in the cloud when calling the direct method
-                static const char newPollTimeResponse[] =
-                    "{ \"success\" : true, \"message\" : \"New Sensor Poll Time %d seconds\" }";
-                size_t responseMaxLength = sizeof(newPollTimeResponse) + strlen(payload);
-                *responsePayload = setup_heap_message(newPollTimeResponse, responseMaxLength, newPollTime);
-                if (*responsePayload == NULL) 
-                {
-                    Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
-                    abort();
-                }
-                *responsePayloadSize = strlen(*responsePayload);
-
-                /*
-                // Define a new timespec variable for the timer and change the timer period
-                struct timespec newAccelReadPeriod = { .tv_sec = newPollTime,.tv_nsec = 0 };
-                SetTimerFdToPeriod(accelTimerFd, &newAccelReadPeriod);
-                */
-
-                return result;
-            }
         }
         else 
         {
             result = 404;
-            Log_Debug("INFO: Direct Method called \"%s\" not found.\n", methodName);
+            Log_Debug("INFO: Direct Method called \"%s\" not found.\n", p_method_name);
 
             static const char noMethodFound[] = "\"method not found '%s'\"";
-            size_t responseMaxLength = sizeof(noMethodFound) + strlen(methodName);
-            *responsePayload = setup_heap_message(noMethodFound, responseMaxLength, methodName);
-            if (*responsePayload == NULL) 
+            size_t responseMaxLength = sizeof(noMethodFound) + strlen(p_method_name);
+            *pp_response_payload = setup_heap_message(noMethodFound, responseMaxLength, p_method_name);
+            if (*pp_response_payload == NULL) 
             {
                 Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
                 abort();
             }
-            *responsePayloadSize = strlen(*responsePayload);
+            *p_response_payload_size = strlen(*pp_response_payload);
             return result;
         }
 
@@ -572,7 +689,6 @@ cb_direct_method_call(const char *methodName, const char *payload,
     // response message and send it back to the IoT Hub for the user to see
 payloadError:
 
-
     result = 400; // Bad request.
     Log_Debug("INFO: Unrecognised direct method payload format.\n");
 
@@ -580,18 +696,16 @@ payloadError:
         "{ \"success\" : false, \"message\" : \"Request does not contain an "
         "identifiable payload\" }";
 
-    size_t responseMaxLength = sizeof(noPayloadResponse) + strlen(payload);
+    size_t responseMaxLength = sizeof(noPayloadResponse) + strlen(p_payload);
     responseMaxLength = sizeof(noPayloadResponse);
-    *responsePayload = setup_heap_message(noPayloadResponse, responseMaxLength);
-    if (*responsePayload == NULL) {
+    *pp_response_payload = setup_heap_message(noPayloadResponse, responseMaxLength);
+    if (*pp_response_payload == NULL) {
         Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
         abort();
     }
-    *responsePayloadSize = strlen(*responsePayload);
+    *p_response_payload_size = strlen(*pp_response_payload);
 
     return result;
-
 }
-
 
 /* [] END OF FILE */
