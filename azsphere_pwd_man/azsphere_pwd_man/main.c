@@ -59,32 +59,30 @@
 *   Macros and #define Constants
 *******************************************************************************/
 
-#define I2C_ISU             PROJECT_ISU2_I2C
-#define I2C_BUS_SPEED       I2C_BUS_SPEED_STANDARD
-#define I2C_TIMEOUT_MS      (100u)
+#define I2C_ISU                 PROJECT_ISU2_I2C
+#define I2C_BUS_SPEED           I2C_BUS_SPEED_STANDARD
+#define I2C_TIMEOUT_MS          (100u)
 
-#define I2C_ADDR_OLED       (0x3C)
+#define I2C_ADDR_OLED           (0x3C)
+#define I2C_ADDR_USB_KEYBOARD   (0x08)
 
-#define OLED_ROTATION       U8G2_R0
+#define OLED_ROTATION           U8G2_R0
 
 #define DIRECT_METHOD_CALL_PAYLOAD_MAX      400
 
 #define JSON_NAME_LENGTH        30
 #define JSON_USERNAME_LENGTH    50
 #define JSON_PASSWORD_LENGTH    50
-#define JSON_URL_LENGTH         100
 
 #define JSON_NAME_NAME          "Name"
 #define JSON_USERNAME_NAME      "Username"
 #define JSON_PASSWORD_NAME      "Password"
-#define JSON_URL_NAME           "Uri"
 
 typedef struct item_data_s
 {
     unsigned char name[JSON_NAME_LENGTH + 1];
     unsigned char username[JSON_USERNAME_LENGTH + 1];
     unsigned char password[JSON_PASSWORD_LENGTH + 1];
-    unsigned char url[JSON_URL_LENGTH + 1];
 } item_data_t;
 
 /*******************************************************************************
@@ -141,6 +139,9 @@ handle_button1_press(void);
 static void
 handle_button2_press(void);
 
+static void
+send_string_to_usb_keyboard(const unsigned char* p_string);
+
 /**
  * @brief Timer event handler for polling button states
  */
@@ -148,7 +149,7 @@ static void
 event_handler_timer_button(EventData *event_data);
 
 static void
-setup_item_sender();
+setup_item_sender(void);
 
 /**
  * @brief Allocates and formats a string message on the heap.
@@ -444,15 +445,44 @@ close_peripherals_and_handlers(void)
 static void
 handle_button1_press(void)
 {
-    gb_is_termination_requested = true;
-
+    send_string_to_usb_keyboard(g_item_data.username);
 }
 
 static void
 handle_button2_press(void)
 {
-    gb_is_termination_requested = true;
+    send_string_to_usb_keyboard(g_item_data.password);
+}
 
+static void 
+send_string_to_usb_keyboard(const unsigned char *p_string)
+{
+    const struct timespec sleep_time = { 0, 150 * 1000000 };    // 150 ms
+
+    int string_length = strlen(p_string);
+    int length_to_send;
+
+    // Send string to I2c in 32-byte chunks since receiving Arduino's Wire
+    // library has 32 byte buffer
+    for (int i = 0; i < string_length; i += 32)
+    {
+        if ((string_length - i) > 32)
+        {
+            length_to_send = 32;
+        }
+        else
+        {
+            length_to_send = string_length - i;
+        }
+
+        if (I2CMaster_Write(g_fd_i2c, I2C_ADDR_USB_KEYBOARD, p_string + i, length_to_send) == -1)
+        {
+            Log_Debug("ERROR Sending data to USB keyboard via I2C.\n");
+        }
+
+        // Delay before sending the next chunk
+        nanosleep(&sleep_time, NULL);
+    }
 }
 
 static void
@@ -514,7 +544,7 @@ event_handler_timer_button(EventData *event_data)
 }
 
 static void
-setup_item_sender()
+setup_item_sender(void)
 {
     u8g2_ClearDisplay(&g_u8g2);
 
@@ -598,7 +628,7 @@ cb_direct_method_call(const char *p_method_name,
             }
 
             // Get item data from JSON object
-            char* p_value_string;
+            const char* p_value_string;
 
             strcpy(g_item_data.name, "\0");
             p_value_string = json_object_get_string(payload_json_object, 
@@ -606,7 +636,6 @@ cb_direct_method_call(const char *p_method_name,
             if (p_value_string != NULL)
             {
                 strncpy(g_item_data.name, p_value_string, JSON_NAME_LENGTH + 1);
-                Log_Debug("JSON Name '%s'\n", g_item_data.name);
             }
 
             strcpy(g_item_data.username, "\0");
@@ -616,7 +645,6 @@ cb_direct_method_call(const char *p_method_name,
             {
                 strncpy(g_item_data.username, p_value_string, 
                     JSON_USERNAME_LENGTH + 1);
-                Log_Debug("JSON Username '%s'\n", g_item_data.username);
             }
 
             strcpy(g_item_data.password, "\0");
@@ -626,16 +654,6 @@ cb_direct_method_call(const char *p_method_name,
             {
                 strncpy(g_item_data.password, p_value_string, 
                     JSON_PASSWORD_LENGTH + 1);
-                Log_Debug("JSON Password '%s'\n", g_item_data.password);
-            }
-
-            strcpy(g_item_data.url, "\0");
-            p_value_string = json_object_get_string(payload_json_object, 
-                JSON_URL_NAME);
-            if (p_value_string != NULL)
-            {
-                strncpy(g_item_data.url, p_value_string, JSON_URL_LENGTH + 1);
-                Log_Debug("JSON Url '%s'\n", g_item_data.url);
             }
 
             if ((strlen(g_item_data.name) == 0) ||
