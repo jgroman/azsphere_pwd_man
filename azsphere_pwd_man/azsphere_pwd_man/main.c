@@ -76,13 +76,34 @@
 
 #define JSON_NAME_NAME          "Name"
 #define JSON_USERNAME_NAME      "Username"
+#define JSON_USERNAMEENTER_NAME "UsernameEnter"
 #define JSON_PASSWORD_NAME      "Password"
+#define JSON_PASSWORDENTER_NAME "PasswordEnter"
+#define JSON_TABJOIN_NAME       "UnameTabPass"
+#define JSON_LOADSEND_NAME      "LoadAndSend"
+
+#define KEY_RETURN              (0xB0)
+#define STRING_CR               "\n"
+#define STRING_TAB              "\t"
+#define STRING_USERNAME         "Username"
+#define STRING_PASSWORD         "Password"
+#define STRING_UNAMETABPASS     "User & Pass"
+#define STRING_BUTTON1          "B1: "
+#define STRING_BUTTON2          "B2: "
+#define STRING_3DOT             "..."
+
+// How long the loaded item will be available
+#define PERIOD_TO_FORGET_SEC      (5 * 60)
 
 typedef struct item_data_s
 {
     unsigned char name[JSON_NAME_LENGTH + 1];
     unsigned char username[JSON_USERNAME_LENGTH + 1];
     unsigned char password[JSON_PASSWORD_LENGTH + 1];
+    bool send_username_enter;
+    bool send_password_enter;
+    bool send_uname_tab_pass;
+    bool send_immediately;
 } item_data_t;
 
 /*******************************************************************************
@@ -151,6 +172,9 @@ event_handler_timer_button(EventData *event_data);
 static void
 setup_item_sender(void);
 
+static void
+show_standby_state(void);
+
 /**
  * @brief Allocates and formats a string message on the heap.
  *
@@ -209,6 +233,9 @@ static u8g2_t g_u8g2;           // OLED device descriptor for u8g2
 
 static item_data_t g_item_data;
 
+static struct timespec g_time;
+static long g_time_to_forget;
+
 /*******************************************************************************
 * Function definitions
 *******************************************************************************/
@@ -246,7 +273,15 @@ main(int argc, char *argv[])
 
         u8g2_ClearDisplay(&g_u8g2);
 
+        strcpy(g_item_data.name, "Item Name");
+        strcpy(g_item_data.username, "username\n");
+        strcpy(g_item_data.password, "longpassword32characters12345678");
+        g_item_data.send_uname_tab_pass = false;
+        g_item_data.send_password_enter = false;
+        g_item_data.send_username_enter = true;
+
         setup_item_sender();
+        //show_standby_state();
 
         // Main program loop
         while (!gb_is_termination_requested)
@@ -264,12 +299,29 @@ main(int argc, char *argv[])
             // - a failure to setup the client is a fatal error.
             if (!AzureIoT_SetupClient()) {
                 Log_Debug("ERROR: Failed to set up IoT Hub client\n");
+                gb_is_termination_requested = true;
                 break;
             }
 
             // AzureIoT_DoPeriodicTasks() needs to be called frequently in order
             // to keep active the flow of data with the Azure IoT Hub
             AzureIoT_DoPeriodicTasks();
+
+            // Check if time to keep item loaded expired
+            if (clock_gettime(CLOCK_REALTIME, &g_time) == -1) {
+                Log_Debug("ERROR: clock_gettime failed with error code: %s (%d).\n",
+                    strerror(errno), errno);
+                gb_is_termination_requested = true;
+            }
+            else if ((g_time.tv_sec > g_time_to_forget) &&
+                (strlen(g_item_data.password) > 0))
+            {
+                // Erase item
+                strcpy(g_item_data.username, "");
+                strcpy(g_item_data.password, "");
+
+                //show_standby_state();
+            }
         }
 
         u8g2_ClearDisplay(&g_u8g2);
@@ -445,21 +497,57 @@ close_peripherals_and_handlers(void)
 static void
 handle_button1_press(void)
 {
-    send_string_to_usb_keyboard(g_item_data.username);
+    char data[2];
+    data[0] = 0x10;
+
+    if (strlen(g_item_data.username) > 0)
+    {
+        send_string_to_usb_keyboard(g_item_data.username);
+        if (g_item_data.send_username_enter)
+        {
+            //send_string_to_usb_keyboard(STRING_CR);
+            I2CMaster_Write(g_fd_i2c, I2C_ADDR_USB_KEYBOARD, data, 1);
+        }
+        else if (g_item_data.send_uname_tab_pass)
+        {
+            send_string_to_usb_keyboard(STRING_TAB);
+            if (strlen(g_item_data.password) > 0)
+            {
+                send_string_to_usb_keyboard(g_item_data.password);
+                if (g_item_data.send_password_enter)
+                {
+                    send_string_to_usb_keyboard(STRING_CR);
+                }
+            }
+        }
+    }
 }
 
 static void
 handle_button2_press(void)
 {
-    send_string_to_usb_keyboard(g_item_data.password);
+    if (strlen(g_item_data.password) > 0)
+    {
+        send_string_to_usb_keyboard(g_item_data.password);
+        if (g_item_data.send_password_enter)
+        {
+            send_string_to_usb_keyboard(STRING_CR STRING_CR);
+        }
+    }
 }
 
 static void 
 send_string_to_usb_keyboard(const unsigned char *p_string)
 {
+    if ((p_string == NULL) || (strlen(p_string) == 0))
+    {
+        return;
+    }
+
     const struct timespec sleep_time = { 0, 150 * 1000000 };    // 150 ms
 
-    int string_length = strlen(p_string);
+    int string_length = (int)strlen(p_string);
+    Log_Debug("String length %d.\n", string_length);
     int length_to_send;
 
     // Send string to I2c in 32-byte chunks since receiving Arduino's Wire
@@ -475,7 +563,9 @@ send_string_to_usb_keyboard(const unsigned char *p_string)
             length_to_send = string_length - i;
         }
 
-        if (I2CMaster_Write(g_fd_i2c, I2C_ADDR_USB_KEYBOARD, p_string + i, length_to_send) == -1)
+        Log_Debug("Sending %d chars.\n", length_to_send);
+
+        if (I2CMaster_Write(g_fd_i2c, I2C_ADDR_USB_KEYBOARD, p_string + i, (size_t)length_to_send) == -1)
         {
             Log_Debug("ERROR Sending data to USB keyboard via I2C.\n");
         }
@@ -483,6 +573,8 @@ send_string_to_usb_keyboard(const unsigned char *p_string)
         // Delay before sending the next chunk
         nanosleep(&sleep_time, NULL);
     }
+
+    return;
 }
 
 static void
@@ -544,20 +636,100 @@ event_handler_timer_button(EventData *event_data)
 }
 
 static void
+show_standby_state(void)
+{
+    u8g2_ClearDisplay(&g_u8g2);
+    u8g2_ClearBuffer(&g_u8g2);
+
+    u8g2_SetFont(&g_u8g2, u8g2_font_t0_22b_tr);
+    lib_u8g2_DrawCenteredStr(&g_u8g2, 42, "Ready");
+
+    u8g2_SendBuffer(&g_u8g2);
+}
+
+static void
 setup_item_sender(void)
 {
+    // Set time delay to forget
+    if (clock_gettime(CLOCK_REALTIME, &g_time) == -1) {
+        Log_Debug("ERROR: clock_gettime failed with error code: %s (%d).\n", 
+            strerror(errno), errno);
+        gb_is_termination_requested = true;
+        return;
+    }
+
+    g_time_to_forget = g_time.tv_sec + PERIOD_TO_FORGET_SEC;
+
+    // Setup display
     u8g2_ClearDisplay(&g_u8g2);
 
     u8g2_ClearBuffer(&g_u8g2);
 
-    u8g2_SetFont(&g_u8g2, u8g2_font_t0_22b_tr);
-    lib_u8g2_DrawCenteredStr(&g_u8g2, 30, g_item_data.name);
+    // Display name
+    u8g2_SetFont(&g_u8g2, u8g2_font_crox4hb_tr);
 
-    u8g2_SetFont(&g_u8g2, u8g2_font_tenfatguys_tr);
-    u8g2_DrawStr(&g_u8g2, 0, 50, "B1: Username");
-    u8g2_DrawStr(&g_u8g2, 0, 64, "B2: Password");
+    // If name overflows display width, "truncate" it with triple dot
+    u8g2_uint_t w_display = u8g2_GetDisplayWidth(&g_u8g2);
+    u8g2_uint_t w_string = u8g2_GetStrWidth(&g_u8g2, g_item_data.name);
+    if (w_string <= w_display)
+    {
+        lib_u8g2_DrawCenteredStr(&g_u8g2, 26, g_item_data.name);
+    }
+    else
+    {
+        u8g2_DrawStr(&g_u8g2, 0, 26, g_item_data.name);
+        u8g2_uint_t w_3dot = u8g2_GetStrWidth(&g_u8g2, STRING_3DOT);
+        u8g2_SetDrawColor(&g_u8g2, 0);
+        u8g2_DrawBox(&g_u8g2, (u8g2_uint_t)(w_display - w_3dot), 10, w_3dot, 20);
+        u8g2_SetDrawColor(&g_u8g2, 1);
+        u8g2_DrawStr(&g_u8g2, (u8g2_uint_t)(w_display - w_3dot), 26, STRING_3DOT);
+    }
+
+    // Display button description
+    u8g2_SetFont(&g_u8g2, u8g2_font_ImpactBits_tr);
+    
+    if (g_item_data.send_uname_tab_pass)
+    {
+        lib_u8g2_DrawCenteredStr(&g_u8g2, 50, STRING_BUTTON1 STRING_UNAMETABPASS);
+    }
+    else
+    {
+        if (strlen(g_item_data.username) > 0)
+        {
+            lib_u8g2_DrawCenteredStr(&g_u8g2, 50, STRING_BUTTON1 STRING_USERNAME);
+        }
+        lib_u8g2_DrawCenteredStr(&g_u8g2, 64, STRING_BUTTON2 STRING_PASSWORD);
+    }
 
     u8g2_SendBuffer(&g_u8g2);
+
+    // If requested, send item data immediately to USB
+    if (g_item_data.send_immediately)
+    {
+        if (strlen(g_item_data.username) > 0)
+        {
+            send_string_to_usb_keyboard(g_item_data.username);
+            if (g_item_data.send_username_enter)
+            {
+                send_string_to_usb_keyboard(STRING_CR);
+            }
+            else if (g_item_data.send_uname_tab_pass)
+            {
+                send_string_to_usb_keyboard(STRING_TAB);
+            }
+        }
+
+        if (strlen(g_item_data.password) > 0)
+        {
+            send_string_to_usb_keyboard(g_item_data.password);
+            if (g_item_data.send_password_enter)
+            {
+                send_string_to_usb_keyboard(STRING_CR);
+            }
+        }
+    }
+
+    return;
 }
 
 static void 
@@ -603,8 +775,6 @@ cb_direct_method_call(const char *p_method_name,
 
         if (strcmp(p_method_name, "set_item_data") == 0) 
         {
-            // Log that the direct method was called and set the result to reflect success!
-            Log_Debug("set_tem_data() Direct Method called\n");
             result = 200;
 
             // Copy the payload into our local buffer then null terminate it.
@@ -629,6 +799,7 @@ cb_direct_method_call(const char *p_method_name,
 
             // Get item data from JSON object
             const char* p_value_string;
+            int value_int;
 
             strcpy(g_item_data.name, "\0");
             p_value_string = json_object_get_string(payload_json_object, 
@@ -654,6 +825,34 @@ cb_direct_method_call(const char *p_method_name,
             {
                 strncpy(g_item_data.password, p_value_string, 
                     JSON_PASSWORD_LENGTH + 1);
+            }
+
+            g_item_data.send_username_enter = false;
+            value_int = json_object_get_boolean(payload_json_object, JSON_USERNAMEENTER_NAME);
+            if (value_int != -1)
+            {
+                g_item_data.send_username_enter = (bool)value_int;
+            }
+
+            g_item_data.send_password_enter = false;
+            value_int = json_object_get_boolean(payload_json_object, JSON_PASSWORDENTER_NAME);
+            if (value_int != -1)
+            {
+                g_item_data.send_password_enter = (bool)value_int;
+            }
+
+            g_item_data.send_uname_tab_pass = false;
+            value_int = json_object_get_boolean(payload_json_object, JSON_TABJOIN_NAME);
+            if (value_int != -1)
+            {
+                g_item_data.send_uname_tab_pass = (bool)value_int;
+            }
+
+            g_item_data.send_immediately = false;
+            value_int = json_object_get_boolean(payload_json_object, JSON_LOADSEND_NAME);
+            if (value_int != -1)
+            {
+                g_item_data.send_immediately = (bool)value_int;
             }
 
             if ((strlen(g_item_data.name) == 0) ||

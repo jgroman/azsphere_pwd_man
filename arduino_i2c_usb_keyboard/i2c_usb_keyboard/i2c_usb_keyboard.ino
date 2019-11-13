@@ -13,7 +13,7 @@
 #define PIN_RXLED 17
 
 // Uncomment following line to enable serial debugging
-#define DEBUG_ENABLED
+//#define DEBUG_ENABLED
 
 void 
 setup() 
@@ -52,8 +52,17 @@ evnt_receive(int bytes_received)
     // Read byte from I2C
     received_byte = Wire.read();
 
-    // Send byte as keypress
-    Keyboard.write(received_byte);
+    if ((received_byte == KEY_RETURN) || (received_byte == 0x10))
+    {
+      Keyboard.press(KEY_RETURN);
+      Keyboard.release(KEY_RETURN);
+    }
+    else
+    {
+      // Send byte as keypress
+      Keyboard.write(received_byte);
+    }
+
     
 #   ifdef DEBUG_ENABLED
     // Print received byte on serial
