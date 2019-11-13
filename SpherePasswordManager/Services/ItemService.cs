@@ -254,8 +254,11 @@ namespace SpherePasswordManager.Services
             {
                 // Update all item properties except for Name and Id
                 item.Username = modifiedItem.Username;
+                item.UsernameEnter = modifiedItem.UsernameEnter;
                 item.Password = modifiedItem.Password;
-                item.Uri = modifiedItem.Uri;
+                item.PasswordEnter = modifiedItem.PasswordEnter;
+                item.UnameTabPass = modifiedItem.UnameTabPass;
+                item.LoadAndSend = modifiedItem.LoadAndSend;
 
                 // Update cached list
                 _cache.Set("ItemList", items);
@@ -336,7 +339,7 @@ namespace SpherePasswordManager.Services
 
             serviceClient.Dispose();
 
-            // Azure Sphere currently returns just result property
+            // Azure Sphere returns status and message property
             string result;
             try
             {

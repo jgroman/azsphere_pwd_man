@@ -31,8 +31,17 @@ namespace SpherePasswordManager.Pages
         [StringLength(50, ErrorMessage = "Username cannot be longer than 50 characters.")]
         public string Username { get; set; }
 
-        [StringLength(100, ErrorMessage = "URL cannot be longer than 100 characters.")]
-        public string Uri { get; set; }
+        [Display(Name = "Send Enter After Username")]
+        public bool UsernameEnter { get; set; }
+
+        [Display(Name = "Send Enter After Password")]
+        public bool PasswordEnter { get; set; }
+
+        [Display(Name = "Send Username <TAB> Password")]
+        public bool UnameTabPass { get; set; }
+
+        [Display(Name = "Send Immediately After Clicking")]
+        public bool LoadAndSend { get; set; }
 
 
         private readonly IItemService _itemService;
@@ -48,7 +57,10 @@ namespace SpherePasswordManager.Pages
             Name = "";
             Username = "";
             Password = "";
-            Uri = "";
+            UsernameEnter = false;
+            PasswordEnter = false;
+            UnameTabPass = false;
+            LoadAndSend = false;
 
             return Page();
         }
@@ -71,7 +83,10 @@ namespace SpherePasswordManager.Pages
             Name = item.Name;
             Username = item.Username;
             Password = item.Password;
-            Uri = item.Uri;
+            UsernameEnter = item.UsernameEnter;
+            PasswordEnter = item.PasswordEnter;
+            UnameTabPass = item.UnameTabPass;
+            LoadAndSend = item.LoadAndSend;
 
             return Page();
         }
@@ -102,7 +117,7 @@ namespace SpherePasswordManager.Pages
 
         public async Task<IActionResult> OnPostSubmitAsync()
         {
-            System.Diagnostics.Debug.WriteLine($"******* Submit {Name}, {Id}");
+            //System.Diagnostics.Debug.WriteLine($"******* Submit {Name}, {Id}");
 
             Item item = new Item()
             {
@@ -110,7 +125,10 @@ namespace SpherePasswordManager.Pages
                 Name = Name,
                 Username = Username,
                 Password = Password,
-                Uri = Uri
+                UsernameEnter = UsernameEnter,
+                PasswordEnter = PasswordEnter,
+                UnameTabPass = UnameTabPass,
+                LoadAndSend = LoadAndSend
             };
 
             if (Id == 0)

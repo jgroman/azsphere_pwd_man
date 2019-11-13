@@ -17,19 +17,32 @@
         <div class="form-group">
             <label class="font-weight-bold" asp-for="Username"></label>
             <input type="text" asp-for="Username" class="form-control" />
+            <div class="form-check">
+                <input class="form-check-input" asp-for="UsernameEnter">
+                <label class="form-check-label" asp-for="UsernameEnter"></label>
+            </div>
             <small class="form-text text-danger"><span asp-validation-for="Username"></span></small>
         </div>
 
         <div class="form-group">
             <label class="font-weight-bold" asp-for="Password"></label>
             <input type="text" asp-for="Password" class="form-control" />
+            <div class="form-check">
+                <input class="form-check-input" asp-for="PasswordEnter">
+                <label class="form-check-label" asp-for="PasswordEnter"></label>
+            </div>
             <small class="form-text text-danger"><span asp-validation-for="Password"></span></small>
         </div>
 
         <div class="form-group">
-            <label class="font-weight-bold" asp-for="Uri"></label>
-            <input type="text" asp-for="Uri" class="form-control" />
-            <small class="form-text text-danger"><span asp-validation-for="Uri"></span></small>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="UnameTabPass">
+                <label class="form-check-label" asp-for="UnameTabPass"></label>
+            </div>
+            <div class="form-check">
+                <input class="form-check-input" asp-for="LoadAndSend">
+                <label class="form-check-label" asp-for="LoadAndSend"></label>
+            </div>
         </div>
 
         <div class="form-group">

@@ -17,6 +17,12 @@ namespace SpherePasswordManager.Models
 
         public string Username { get; set; }
 
-        public string Uri { get; set; }
+        public bool UsernameEnter { get; set; }
+
+        public bool PasswordEnter { get; set; }
+
+        public bool UnameTabPass { get; set; }
+
+        public bool LoadAndSend { get; set; }
     }
 }
