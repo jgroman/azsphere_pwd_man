@@ -52,22 +52,31 @@ evnt_receive(int bytes_received)
     // Read byte from I2C
     received_byte = Wire.read();
 
-    if ((received_byte == KEY_RETURN) || (received_byte == 0x10))
+#   ifdef DEBUG_ENABLED
+    // Print received byte on serial
+    if (received_byte < 16)
+    {
+      Serial.print("0");
+    }
+    Serial.print(received_byte, HEX);
+    Serial.print(" ");
+#   endif
+
+    if (received_byte == 0x0A)  // Newline \n
     {
       Keyboard.press(KEY_RETURN);
+      delay(30);
       Keyboard.release(KEY_RETURN);
+      
+#     ifdef DEBUG_ENABLED
+      Serial.println("");
+#     endif
     }
     else
     {
       // Send byte as keypress
       Keyboard.write(received_byte);
     }
-
-    
-#   ifdef DEBUG_ENABLED
-    // Print received byte on serial
-    Serial.print(received_byte);
-#   endif
   }
 
   delay(100);

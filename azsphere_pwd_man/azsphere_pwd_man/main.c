@@ -68,12 +68,10 @@
 
 #define OLED_ROTATION           U8G2_R0
 
+// Max size of direct method call payload
 #define DIRECT_METHOD_CALL_PAYLOAD_MAX      400
 
-#define JSON_NAME_LENGTH        30
-#define JSON_USERNAME_LENGTH    50
-#define JSON_PASSWORD_LENGTH    50
-
+// Names of properties in JSON incoming from IoT Hub
 #define JSON_NAME_NAME          "Name"
 #define JSON_USERNAME_NAME      "Username"
 #define JSON_USERNAMEENTER_NAME "UsernameEnter"
@@ -82,8 +80,12 @@
 #define JSON_TABJOIN_NAME       "UnameTabPass"
 #define JSON_LOADSEND_NAME      "LoadAndSend"
 
-#define KEY_RETURN              (0xB0)
-#define STRING_CR               "\n"
+// Max allowed length of JSON string properties
+#define JSON_NAME_LENGTH        30
+#define JSON_USERNAME_LENGTH    50
+#define JSON_PASSWORD_LENGTH    50
+
+#define STRING_NL               "\n"
 #define STRING_TAB              "\t"
 #define STRING_USERNAME         "Username"
 #define STRING_PASSWORD         "Password"
@@ -92,18 +94,18 @@
 #define STRING_BUTTON2          "B2: "
 #define STRING_3DOT             "..."
 
-// How long the loaded item will be available
+// How long the loaded item will be available before erasing
 #define PERIOD_TO_FORGET_SEC      (5 * 60)
 
 typedef struct item_data_s
 {
-    unsigned char name[JSON_NAME_LENGTH + 1];
-    unsigned char username[JSON_USERNAME_LENGTH + 1];
-    unsigned char password[JSON_PASSWORD_LENGTH + 1];
-    bool send_username_enter;
-    bool send_password_enter;
-    bool send_uname_tab_pass;
-    bool send_immediately;
+    unsigned char name[JSON_NAME_LENGTH + 1];           // Login item name
+    unsigned char username[JSON_USERNAME_LENGTH + 1];   // Login username
+    unsigned char password[JSON_PASSWORD_LENGTH + 1];   // Login password
+    bool send_username_enter;                   // Send Enter after username
+    bool send_password_enter;                   // Send Enter after password
+    bool send_uname_tab_pass;                   // Send username <TAB> password
+    bool send_immediately;            // Send login immediately after receiving
 } item_data_t;
 
 /*******************************************************************************
@@ -155,25 +157,46 @@ static void
 handle_button1_press(void);
 
 /**
- * @brief Button2 press handler
+ * @brief Button2 press handler.
  */
 static void
 handle_button2_press(void);
 
+/**
+ * @brief Send null terminated string via I2C to keyboard emulator
+ */
 static void
 send_string_to_usb_keyboard(const unsigned char* p_string);
 
 /**
- * @brief Timer event handler for polling button states
+ * @brief Timer event handler for polling button states.
  */
 static void
 event_handler_timer_button(EventData *event_data);
 
+/**
+ * @brief Show item on display, preload login strings.
+ */
 static void
 setup_item_sender(void);
 
+/**
+ * @brief Show standby display.
+ */
 static void
 show_standby_state(void);
+
+/**
+ * @brief Send username to keyboard, take flags into account.
+ */
+static void
+send_username(void);
+
+/**
+ * @brief Send password to keyboard, take flags into account.
+ */
+static void
+send_password(void);
 
 /**
  * @brief Allocates and formats a string message on the heap.
@@ -240,14 +263,9 @@ static long g_time_to_forget;
 * Function definitions
 *******************************************************************************/
 
-/// <summary>
-///     Application entry point
-/// </summary>
 int
 main(int argc, char *argv[])
 {
-    Log_Debug("\n*** Starting ***\n");
-
     gb_is_termination_requested = false;
 
     // Initialize handlers
@@ -273,15 +291,7 @@ main(int argc, char *argv[])
 
         u8g2_ClearDisplay(&g_u8g2);
 
-        strcpy(g_item_data.name, "Item Name");
-        strcpy(g_item_data.username, "username\n");
-        strcpy(g_item_data.password, "longpassword32characters12345678");
-        g_item_data.send_uname_tab_pass = false;
-        g_item_data.send_password_enter = false;
-        g_item_data.send_username_enter = true;
-
-        setup_item_sender();
-        //show_standby_state();
+        show_standby_state();
 
         // Main program loop
         while (!gb_is_termination_requested)
@@ -307,9 +317,9 @@ main(int argc, char *argv[])
             // to keep active the flow of data with the Azure IoT Hub
             AzureIoT_DoPeriodicTasks();
 
-            // Check if time to keep item loaded expired
+            // Check if time to keep login data expired
             if (clock_gettime(CLOCK_REALTIME, &g_time) == -1) {
-                Log_Debug("ERROR: clock_gettime failed with error code: %s (%d).\n",
+                Log_Debug("ERROR: clock_gettime failed: %s (%d).\n",
                     strerror(errno), errno);
                 gb_is_termination_requested = true;
             }
@@ -320,7 +330,7 @@ main(int argc, char *argv[])
                 strcpy(g_item_data.username, "");
                 strcpy(g_item_data.password, "");
 
-                //show_standby_state();
+                show_standby_state();
             }
         }
 
@@ -497,43 +507,48 @@ close_peripherals_and_handlers(void)
 static void
 handle_button1_press(void)
 {
-    char data[2];
-    data[0] = 0x10;
-
-    if (strlen(g_item_data.username) > 0)
-    {
-        send_string_to_usb_keyboard(g_item_data.username);
-        if (g_item_data.send_username_enter)
-        {
-            //send_string_to_usb_keyboard(STRING_CR);
-            I2CMaster_Write(g_fd_i2c, I2C_ADDR_USB_KEYBOARD, data, 1);
-        }
-        else if (g_item_data.send_uname_tab_pass)
-        {
-            send_string_to_usb_keyboard(STRING_TAB);
-            if (strlen(g_item_data.password) > 0)
-            {
-                send_string_to_usb_keyboard(g_item_data.password);
-                if (g_item_data.send_password_enter)
-                {
-                    send_string_to_usb_keyboard(STRING_CR);
-                }
-            }
-        }
-    }
+    send_username();
 }
 
 static void
 handle_button2_press(void)
+{
+    send_password();
+}
+
+static void
+send_password(void)
 {
     if (strlen(g_item_data.password) > 0)
     {
         send_string_to_usb_keyboard(g_item_data.password);
         if (g_item_data.send_password_enter)
         {
-            send_string_to_usb_keyboard(STRING_CR STRING_CR);
+            send_string_to_usb_keyboard(STRING_NL);
         }
     }
+
+    return;
+}
+
+static void
+send_username(void)
+{
+    if (strlen(g_item_data.username) > 0)
+    {
+        send_string_to_usb_keyboard(g_item_data.username);
+        if (g_item_data.send_uname_tab_pass)
+        {
+            send_string_to_usb_keyboard(STRING_TAB);
+            send_password();
+        }
+        else if (g_item_data.send_username_enter)
+        {
+            send_string_to_usb_keyboard(STRING_NL);
+        }
+    }
+
+    return;
 }
 
 static void 
@@ -547,7 +562,6 @@ send_string_to_usb_keyboard(const unsigned char *p_string)
     const struct timespec sleep_time = { 0, 150 * 1000000 };    // 150 ms
 
     int string_length = (int)strlen(p_string);
-    Log_Debug("String length %d.\n", string_length);
     int length_to_send;
 
     // Send string to I2c in 32-byte chunks since receiving Arduino's Wire
@@ -563,9 +577,8 @@ send_string_to_usb_keyboard(const unsigned char *p_string)
             length_to_send = string_length - i;
         }
 
-        Log_Debug("Sending %d chars.\n", length_to_send);
-
-        if (I2CMaster_Write(g_fd_i2c, I2C_ADDR_USB_KEYBOARD, p_string + i, (size_t)length_to_send) == -1)
+        if (I2CMaster_Write(g_fd_i2c, I2C_ADDR_USB_KEYBOARD, p_string + i, 
+            (size_t)length_to_send) == -1)
         {
             Log_Debug("ERROR Sending data to USB keyboard via I2C.\n");
         }
@@ -685,7 +698,7 @@ setup_item_sender(void)
         u8g2_DrawStr(&g_u8g2, (u8g2_uint_t)(w_display - w_3dot), 26, STRING_3DOT);
     }
 
-    // Display button description
+    // Display button descriptions
     u8g2_SetFont(&g_u8g2, u8g2_font_ImpactBits_tr);
     
     if (g_item_data.send_uname_tab_pass)
@@ -706,26 +719,11 @@ setup_item_sender(void)
     // If requested, send item data immediately to USB
     if (g_item_data.send_immediately)
     {
-        if (strlen(g_item_data.username) > 0)
-        {
-            send_string_to_usb_keyboard(g_item_data.username);
-            if (g_item_data.send_username_enter)
-            {
-                send_string_to_usb_keyboard(STRING_CR);
-            }
-            else if (g_item_data.send_uname_tab_pass)
-            {
-                send_string_to_usb_keyboard(STRING_TAB);
-            }
-        }
+        send_username();
 
-        if (strlen(g_item_data.password) > 0)
+        if (!g_item_data.send_uname_tab_pass)
         {
-            send_string_to_usb_keyboard(g_item_data.password);
-            if (g_item_data.send_password_enter)
-            {
-                send_string_to_usb_keyboard(STRING_CR);
-            }
+            send_password();
         }
     }
 
@@ -751,8 +749,6 @@ cb_direct_method_call(const char *p_method_name,
     const char *p_payload, size_t payload_size, 
     char **pp_response_payload, size_t *p_response_payload_size)
 {
-    Log_Debug("\nDirect Method called %s\n", p_method_name);
-
     int result = 404; // HTTP status code.
 
     if (payload_size < DIRECT_METHOD_CALL_PAYLOAD_MAX) 
@@ -764,7 +760,8 @@ cb_direct_method_call(const char *p_method_name,
         if (payload_string == NULL)
         {
             // Not enough memory for local payload buffer
-            Log_Debug("ERROR: Could not allocate buffer for direct method request payload.\n");
+            Log_Debug("ERROR: Could not allocate buffer for direct method "
+                "request payload.\n");
             abort();
         }
 
@@ -773,7 +770,8 @@ cb_direct_method_call(const char *p_method_name,
         *pp_response_payload = NULL;  // Reponse payload content.
         *p_response_payload_size = 0; // Response payload content size.
 
-        if (strcmp(p_method_name, "set_item_data") == 0) 
+        // Direct method 'set_item_data'
+        if (strcmp(p_method_name, "set_item_data") == 0)
         {
             result = 200;
 
@@ -828,28 +826,32 @@ cb_direct_method_call(const char *p_method_name,
             }
 
             g_item_data.send_username_enter = false;
-            value_int = json_object_get_boolean(payload_json_object, JSON_USERNAMEENTER_NAME);
+            value_int = json_object_get_boolean(payload_json_object, 
+                JSON_USERNAMEENTER_NAME);
             if (value_int != -1)
             {
                 g_item_data.send_username_enter = (bool)value_int;
             }
 
             g_item_data.send_password_enter = false;
-            value_int = json_object_get_boolean(payload_json_object, JSON_PASSWORDENTER_NAME);
+            value_int = json_object_get_boolean(payload_json_object, 
+                JSON_PASSWORDENTER_NAME);
             if (value_int != -1)
             {
                 g_item_data.send_password_enter = (bool)value_int;
             }
 
             g_item_data.send_uname_tab_pass = false;
-            value_int = json_object_get_boolean(payload_json_object, JSON_TABJOIN_NAME);
+            value_int = json_object_get_boolean(payload_json_object, 
+                JSON_TABJOIN_NAME);
             if (value_int != -1)
             {
                 g_item_data.send_uname_tab_pass = (bool)value_int;
             }
 
             g_item_data.send_immediately = false;
-            value_int = json_object_get_boolean(payload_json_object, JSON_LOADSEND_NAME);
+            value_int = json_object_get_boolean(payload_json_object, 
+                JSON_LOADSEND_NAME);
             if (value_int != -1)
             {
                 g_item_data.send_immediately = (bool)value_int;
@@ -864,14 +866,18 @@ cb_direct_method_call(const char *p_method_name,
             // Prepare item data to be sent to USB
             setup_item_sender();
 
-            // Construct the response message.  This will be displayed in the cloud when calling the direct method
+            // Construct the response message.  This will be displayed 
+            // in the cloud when calling the direct method
             static const char newPollTimeResponse[] =
                 "{ \"success\" : true, \"message\" : \"'%s' loaded\" }";
-            size_t responseMaxLength = sizeof(newPollTimeResponse) + strlen(g_item_data.name);
-            *pp_response_payload = setup_heap_message(newPollTimeResponse, responseMaxLength, g_item_data.name);
+            size_t responseMaxLength = sizeof(newPollTimeResponse) + 
+                strlen(g_item_data.name);
+            *pp_response_payload = setup_heap_message(newPollTimeResponse, 
+                responseMaxLength, g_item_data.name);
             if (*pp_response_payload == NULL)
             {
-                Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
+                Log_Debug("ERROR: Could not allocate buffer for direct method "
+                    "response payload.\n");
                 abort();
             }
             *p_response_payload_size = strlen(*pp_response_payload);
@@ -881,14 +887,18 @@ cb_direct_method_call(const char *p_method_name,
         else 
         {
             result = 404;
-            Log_Debug("INFO: Direct Method called \"%s\" not found.\n", p_method_name);
+            Log_Debug("INFO: Direct Method called \"%s\" not found.\n", 
+                p_method_name);
 
             static const char noMethodFound[] = "\"method not found '%s'\"";
-            size_t responseMaxLength = sizeof(noMethodFound) + strlen(p_method_name);
-            *pp_response_payload = setup_heap_message(noMethodFound, responseMaxLength, p_method_name);
+            size_t responseMaxLength = sizeof(noMethodFound) + 
+                strlen(p_method_name);
+            *pp_response_payload = setup_heap_message(noMethodFound, 
+                responseMaxLength, p_method_name);
             if (*pp_response_payload == NULL) 
             {
-                Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
+                Log_Debug("ERROR: Could not allocate buffer for direct method "
+                    "response payload.\n");
                 abort();
             }
             *p_response_payload_size = strlen(*pp_response_payload);
@@ -913,11 +923,11 @@ payloadError:
         "{ \"success\" : false, \"message\" : \"Request does not contain an "
         "identifiable payload\" }";
 
-    size_t responseMaxLength = sizeof(noPayloadResponse) + strlen(p_payload);
-    responseMaxLength = sizeof(noPayloadResponse);
-    *pp_response_payload = setup_heap_message(noPayloadResponse, responseMaxLength);
+    *pp_response_payload = setup_heap_message(noPayloadResponse, 
+        sizeof(noPayloadResponse));
     if (*pp_response_payload == NULL) {
-        Log_Debug("ERROR: Could not allocate buffer for direct method response payload.\n");
+        Log_Debug("ERROR: Could not allocate buffer for direct method "
+            "response payload.\n");
         abort();
     }
     *p_response_payload_size = strlen(*pp_response_payload);
