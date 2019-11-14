@@ -279,27 +279,7 @@ namespace SpherePasswordManager.Services
             // Obtain IoT Hub connection string and Azure Sphere device name
             ConfigData configData = await _configDataService.ReadAsync();
 
-            ServiceClient serviceClient;
-
             // Prepare device method call via Iot Hub
-            try
-            {
-                serviceClient = ServiceClient.CreateFromConnectionString(configData.IotHubService);
-            }
-            catch (FormatException fex)
-            {
-                if (fex.Message.Equals("Malformed Token"))
-                {
-                    // Invalid Iot Hub Service Connection String
-                    return ("ERROR: Invalid Iot Hub Service Connection String");
-                }
-                return ("ERROR: Iot Hub Message Format Exception");
-            }
-            catch (ArgumentException)
-            {
-                return ("ERROR: Invalid Iot Hub Service Connection String");
-            }
-
             string methodName = _config.GetValue<string>("AzureSphereDevice:directMethodName");
             int methodTimeout = _config.GetValue<int>("AzureSphereDevice:directMethodCallTimeout");
 
@@ -310,18 +290,32 @@ namespace SpherePasswordManager.Services
 
             methodInvocation.SetPayloadJson(JsonSerializer.Serialize(item));
 
-            // Invoke the direct method asynchronously and get the response from IoT device.
+            ServiceClient serviceClient;
             CloudToDeviceMethodResult deviceResult;
+
             try
             {
-                deviceResult = await serviceClient.InvokeDeviceMethodAsync(configData.AzureSphereDevice, methodInvocation);
-                //System.Diagnostics.Debug.WriteLine($"***** Response payload '{deviceResult.GetPayloadAsJson()}'");
+                serviceClient = ServiceClient.CreateFromConnectionString(configData.IotHubService);
+                using(serviceClient)
+                {
+                    // Invoke the direct method asynchronously and get the response from IoT device.
+                    deviceResult = await serviceClient.InvokeDeviceMethodAsync(configData.AzureSphereDevice, methodInvocation);
+                }
+            }
+            catch (FormatException fex)
+            {
+                if (fex.Message.Equals("Malformed Token"))
+                {
+                    return ("ERROR: Invalid Iot Hub Service Connection String");
+                }
+                return ("ERROR: Iot Hub Message Format Exception");
+            }
+            catch (ArgumentException)
+            {
+                return ("ERROR: Invalid Iot Hub Service Connection String");
             }
             catch (DeviceNotFoundException dnfex)
             {
-                //System.Diagnostics.Debug.WriteLine($"***** EX: '{dnfex}'");
-
-                serviceClient.Dispose();
 
                 if (dnfex.Message.Contains(":404001,"))
                 {
@@ -337,21 +331,26 @@ namespace SpherePasswordManager.Services
                 return ("ERROR: Device not found");
             }
 
-            serviceClient.Dispose();
-
             // Azure Sphere returns status and message property
-            string result;
+            bool success = true;
+            string message;
             try
             {
                 JsonDocument document = JsonDocument.Parse(deviceResult.GetPayloadAsJson());
-                result = document.RootElement.GetProperty("result").GetString();
+                message = document.RootElement.GetProperty("message").GetString();
+                success = document.RootElement.GetProperty("success").GetBoolean();
             }
             catch (JsonException)
             {
-                result = "ERROR: Response parsing failed";
+                message = "ERROR: Response parsing failed";
             }
 
-            return result;
+            if (!success)
+            {
+                message += "ERROR: ";
+            }
+
+            return message;
         }
     }
 }
