@@ -14,6 +14,7 @@ namespace SpherePasswordManager.Pages
         public int Id { get; set; }
 
         [Required]
+        [Display(Name = "Item Name")]
         [StringLength(30, ErrorMessage = "Name cannot be longer than 30 characters.")]
         [RegularExpression(@"^[a-zA-Z0-9\-]*$", ErrorMessage = "Alphanumeric characters and dashes only.")]
         [PageRemote(
@@ -117,8 +118,6 @@ namespace SpherePasswordManager.Pages
 
         public async Task<IActionResult> OnPostSubmitAsync()
         {
-            //System.Diagnostics.Debug.WriteLine($"******* Submit {Name}, {Id}");
-
             Item item = new Item()
             {
                 Id = Id,
