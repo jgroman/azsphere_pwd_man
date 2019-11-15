@@ -137,7 +137,14 @@ namespace SpherePasswordManager.Services
             var items = await ReadAllAsync();
 
             // Compute Id for new item
-            newItem.Id = items.Max(c => c.Id) + 1;
+            if (items.Count == 0)
+            {
+                newItem.Id = 1;
+            }
+            else
+            {
+                newItem.Id = items.Max(c => c.Id) + 1;
+            }
 
             // Add item to list
             items.Add(newItem);
