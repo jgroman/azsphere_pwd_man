@@ -1,8 +1,0 @@
-Visual Studio 2017
-- add Azure Development workload
-
-Install .NET Core SDK 2.2
-Install Azure CLI (Optional)
-- do "az login" for local keyVault access
-
-
