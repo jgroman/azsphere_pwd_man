@@ -1,0 +1,3 @@
+[submodule "azsphere_pwd_man/lib_u8g2"]
+	path = azsphere_pwd_man/lib_u8g2
+	url = https://github.com/jgroman/azsphere_lib_u8g2.git
